@@ -1,0 +1,61 @@
+<configuration>
+    <!-- Just a variable. Used below as ${LOG_DIR}. -->
+    <property name="LOG_DIR" value="logs" />
+
+    <!-- 2.1. Console destination: plain text format and no appender-level filter. -->
+    <appender name="PLAIN_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%-5level thread=%thread requestId=%X{requestId:-none} class=%logger{0} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Small additivity demo destination. It is separate so duplicated routing is easy to reason about. -->
+    <appender name="ADDITIVITY_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>ADD  class=%logger{0} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 2.2. File destination: path, daily rolling policy, 14 days retention, only exactly INFO, JSON encoder. -->
+    <appender name="INFO_JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/info.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/info.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>14</maxHistory>
+        </rollingPolicy>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>INFO</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder" />
+    </appender>
+
+    <!-- 1.1. Async wrapper around console appender. The application thread puts log events into this queue. -->
+    <appender name="ASYNC_PLAIN_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>32</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="PLAIN_CONSOLE" />
+    </appender>
+
+    <!-- 1.2. Async wrapper around file appender. Same log event can go to multiple destinations. -->
+    <appender name="ASYNC_INFO_JSON_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>32</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="INFO_JSON_FILE" />
+    </appender>
+
+    <!-- 1. Package log level: what levels are allowed for com.example.logging classes. TRACE is blocked. -->
+    <logger name="com.example.logging" level="DEBUG" />
+
+    <!-- Additivity demo: false means do not also pass this event upward to com.example.logging/root. -->
+    <logger name="com.example.logging.additivity" level="INFO" additivity="false">
+        <appender-ref ref="ADDITIVITY_CONSOLE" />
+    </logger>
+
+    <!-- 0. Root logger sends every allowed event to both async appenders. -->
+    <root level="DEBUG">
+        <appender-ref ref="ASYNC_PLAIN_CONSOLE" />
+        <appender-ref ref="ASYNC_INFO_JSON_FILE" />
+    </root>
+</configuration>

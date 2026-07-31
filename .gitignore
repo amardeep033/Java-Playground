@@ -1,0 +1,36 @@
+# Compiled Java output
+*.class
+out/
+bin/
+
+# Maven
+target/
+
+# Gradle
+.gradle/
+build/
+
+# Logs
+*.log
+logs/
+
+# IDE/editor files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local environment/secrets
+.env
+.env.*
+!.env.example
+
+# Temporary files
+tmp/
+temp/

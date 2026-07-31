@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "grpcstudy";
+option java_outer_classname = "UserProto";
+
+service UserService {
+  // Client sends id/name; server stores it.
+  rpc AddUser(AddUserRequest) returns (AddUserResponse);
+  // Client sends id; server returns id/name.
+  rpc GetUser(GetUserRequest) returns (User);
+}
+
+// Request body for AddUser RPC.
+message AddUserRequest {
+  int32 id = 1;
+  string name = 2;
+}
+
+// Response body for AddUser RPC.
+message AddUserResponse {
+  bool saved = 1;
+}
+
+// Request body for GetUser RPC.
+message GetUserRequest {
+  int32 id = 1;
+}
+
+// Response body for GetUser RPC.
+message User {
+  int32 id = 1;
+  string name = 2;
+}
