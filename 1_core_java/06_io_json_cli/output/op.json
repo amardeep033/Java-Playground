@@ -1,0 +1,19 @@
+[ {
+  "outputType" : 1,
+  "message" : "Created from hardcoded JSON type 1",
+  "success" : true,
+  "extra" : {
+    "rule" : "TYPE_1_RULE"
+  },
+  "items" : [ "alpha", "beta" ],
+  "error" : null
+}, {
+  "outputType" : 2,
+  "message" : "Created from hardcoded JSON type 2",
+  "success" : false,
+  "extra" : {
+    "rule" : "TYPE_2_RULE"
+  },
+  "items" : [ "gamma", "delta" ],
+  "error" : null
+} ]

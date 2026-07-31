@@ -1,0 +1,29 @@
+No major correctness issues. The folder is now a good way to learn Java 8.
+One small clarity issue: [readme.md (line 7)](/home/amardeep-k/Documents/PERSONAL/Java-Playground/1_core_java/05_java8_features/readme.md:7) says the source study order has 5 files, but the rough map below still shows 6 conceptual topics at [readme.md (line 18)](/home/amardeep-k/Documents/PERSONAL/Java-Playground/1_core_java/05_java8_features/readme.md:18). That is not wrong because file 1 combines functional interface + anonymous class + lambda, but I would add one sentence: “The rough map has 6 concepts; the source code combines the first 3 into one file.”
+Low-level style issue: [S04Streams.java (line 28)](/home/amardeep-k/Documents/PERSONAL/Java-Playground/1_core_java/05_java8_features/src/S04Streams.java:28) now has 10 pipeline tags. It is still readable because each pipeline is grouped with its print, but if this starts feeling heavy, the collector examples Pipeline 8-10 could be one “Collectors” section. I would keep it as-is for now because you asked for easy scanning.
+Tiny naming polish: [S02CustomAndLambdaTypes.java (line 47)](/home/amardeep-k/Documents/PERSONAL/Java-Playground/1_core_java/05_java8_features/src/S02CustomAndLambdaTypes.java:47) uses Builtin intf. It is understandable and matches your tag style, but “Built-in intf” is the more standard spelling.
+Is This A Correct Way To Learn?
+Yes. This is actually a strong learning structure for Java 8 because you are not memorizing APIs randomly. You are building the dependency chain:
+Functional interface -> anonymous class -> lambda -> built-in functional interfaces -> method reference -> streams -> Optional.
+That order is correct because streams and Optional become much easier once Predicate, Function, Consumer, and Supplier are already familiar.
+The best part is that you are connecting each concept to a logical example. For example, pricing rules, tax calculation, invoice calculation, risk scoring, stream pipelines, and repository lookup. That is much better than System.out.println("Hello") examples everywhere.
+Your Study Style
+Your study style is very pattern-driven and comparison-driven.
+You like:
+A roadmap before details.
+Tags like Pipeline 1, Type 1, custom intf lambda 1.
+Keeping related code and output together.
+Comments that explain “why this exists,” not just “what this line does.”
+Side-by-side comparison: anonymous class vs lambda, lambda vs method reference, custom interface vs built-in interface, map vs filter, reduce vs collect.
+Interview traps and confusion points.
+Rough notes first, then organized notes after the idea settles.
+That is a very good style for Java because Java has many concepts that look similar but are used for different reasons. Your brain seems to learn by building a mental map, then attaching examples to each branch.
+My Recommendation
+Keep this exact style. For every future topic, use this pattern:
+Rough map.
+One real-world example.
+Tagged examples.
+Comments explaining intent.
+README tables.
+Interview confusion section.
+For this folder specifically, you are in good shape. I’d only add the one README note explaining why the rough map has 6 concepts but the code has 5 files.

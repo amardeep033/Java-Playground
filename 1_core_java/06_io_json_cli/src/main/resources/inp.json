@@ -1,0 +1,28 @@
+[
+  {
+    "type": 1,
+    "name": "first input",
+    "active": true,
+    "details": {
+      "source": "file"
+    },
+    "tags": [
+      "line",
+      "json"
+    ],
+    "note": null
+  },
+  {
+    "type": 2,
+    "name": "second input",
+    "active": false,
+    "details": {
+      "source": "file"
+    },
+    "tags": [
+      "bulk",
+      "json"
+    ],
+    "note": null
+  }
+]
