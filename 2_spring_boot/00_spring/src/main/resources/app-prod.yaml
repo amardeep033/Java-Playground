@@ -1,0 +1,12 @@
+# Intentionally nonstandard filename, imported by application.properties.
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+logger:
+  # Overrides logger.level=INFO from application.properties.
+  level: ERROR
+
+  # Exists directly in the prod profile; application.properties has no destination.
+  destination: FILE

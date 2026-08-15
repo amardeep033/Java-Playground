@@ -27,7 +27,7 @@
 |10|`17_logging/`|SLF4J, Logback, MDC, structured/JSON logging, correlation IDs|
 |11|`18_testing/`|JUnit, Mockito, benchmarking|
 
-## Phase 2 — `2_spring/`
+## Phase 2.1 — `2_spring_boot/`
 
 | # | Folder | Topics |
 |---|---|---|
@@ -40,7 +40,7 @@
 |06|`06_validation/`|Validation API|
 |07|`07_transactions/`|`@Transactional`|
 
-## Phase 3 — `3_spring_boot/`
+## Phase 2.2 — `2_spring_boot/`
 
 | # | Folder | Topics |
 |---|---|---|
@@ -54,7 +54,7 @@
 |07|`07_actuator/`|Monitoring|
 |08|`08_security_jwt/`|Spring Security + JWT + OAuth2 — **owns security for the whole roadmap**|
 
-## Phase 4 — `4_tools/`
+## Phase 3 — `3_tools/`
 
 | # | Folder | Topics |
 |---|---|---|
