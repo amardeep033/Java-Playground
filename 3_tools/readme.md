@@ -1,11 +1,11 @@
-## Phase 4 — `4_tools/`
+# 3_tools
 
-| # | Folder | Topics |
-|---|---|---|
-|01|`01_postgresql/`|Indexes, transactions, `EXPLAIN ANALYZE`, isolation levels — every Java backend interview expects this|
-|02|`02_redis/`|Caching, pub/sub, distributed locks|
-|03|`03_kafka/`|Producer, consumer, offsets, DLQ|
-|04|`04_rabbitmq/`|Exchange, queue, routing|
-|05|`05_opentelemetry/`|Tracing, metrics, logs (fast pass — already run this in prod on Rust)|
-|06|`06_docker/`|Compose, networking, images|
-|07|`07_nginx/`|Reverse proxy|
+| Folder | Topics |
+|---|---|
+| `01_postgresql/` | Tables, indexes, transactions, isolation levels, `EXPLAIN ANALYZE` |
+| `02_redis/` | Caching, TTL, pub/sub, distributed locks |
+| `03_kafka/` | Producers, consumers, topics, partitions, offsets, consumer groups, DLQ |
+| `04_rabbitmq/` | Exchanges, queues, routing keys, acknowledgements, retries |
+| `05_opentelemetry/` | Traces, metrics, logs, context propagation |
+| `06_docker/` | Images, containers, volumes, networks, Docker Compose |
+| `07_nginx/` | Reverse proxy, load balancing basics, TLS termination |

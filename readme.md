@@ -1,67 +1,65 @@
-## Phase 1.1 — `1_core_java/`
+# Java Playground
 
-| # | Folder | Topics |
-|---|---|---|
-|00|`00_overall/`|WORA, JVM vs JRE vs JDK, how to compile/run Java, Java vs Spring vs Spring Boot, Maven vs Gradle|
-|01|`01_variables/`|Local, instance, static, final, why Java has no true global variables|
-|01|`02_methods/`|`public static void main(String[] args)`, static vs instance, overloading, varargs|
-|01|`03_classes_objects_packages/`|Class, object, `new` keyword, object lifecycle, folder structure, access modifiers, package, import, built-in vs user-defined packages|
-|01|`04_constructors/`|Default, parameterized, copy, private, overloading|
-|01|`05_oops/`|Inheritance, encapsulation, abstraction, polymorphism, runtime polymorphism, Interfaces, abstract class|
-|02|`06_datatypes/`|Primitive vs non-primitive, wrapper types like `Integer`, arrays like `int[]`, `String`|
-|02|`07_strings/`|String literal/string pool vs `new` keyword/heap, `StringBuilder` vs `StringBuffer` vs `StringTokenizer`|
-|02|`08_collections/`|Why the Collections Framework exists, Collection interface vs Collections utility class, List, LinkedList, Vector, Stack, Set, Queue, Map, HashMap, ConcurrentHashMap, concurrent collections|
-|03|`09_generics_wildcards/`|generics, wildcards|
-|04|`10_exception_handling/`|Checked vs runtime, custom exceptions, `NullPointerException`, exception chaining, try/catch/finally vs `finalize()` — **owns this topic**|
-|05|`11_java8_features/`|Lambdas, Streams, Optional, method references|
+# 1_core_java
 
-## Phase 1.2 — `1_core_java/`
+| Folder | Topics |
+|---|---|
+| `00_overall/` | WORA, JVM vs JRE vs JDK, compiling/running Java, Java vs Spring vs Spring Boot, Maven vs Gradle |
+| `01_oops_basics/` | Classes, objects, packages, access modifiers, constructors, inheritance, encapsulation, abstraction, polymorphism, interfaces, abstract classes |
+| `02_datatype/` | Primitive and non-primitive data types, wrapper classes, arrays, strings |
+| `03_generics_wildcards/` | Why generics exist, generic classes, generic methods, generic interfaces, bounds, wildcards, PECS, type erasure |
+| `04_exception_handling/` | Exception hierarchy, checked vs unchecked exceptions, `throw` vs `throws`, custom exceptions, null pointer handling, exception chaining, multi-catch, try-with-resources |
+| `05_java8_features/` | Functional interfaces, anonymous classes vs lambdas, lambda types, method references, streams, Optional |
+| `06_io_json_cli/` | File IO, NIO `Path`/`Files`, Jackson JSON parsing, CLI input/output |
+| `07_mem_jvm/` | References, pass-by-value, copying/cloning, `final`, object lifecycle, memory and JVM fundamentals |
+| `08_threads/` | Thread basics, `ExecutorService`, `Future`, `CompletableFuture`, `synchronized`, `volatile`, `AtomicInteger`, blocking queues, concurrent maps, locks, race conditions, deadlock |
+| `09_network/` | TCP sockets, REST client/server basics, gRPC client/server basics, protobuf |
+| `10_logging/` | SLF4J, Logback, logging configuration, levels, appenders, additivity |
+| `11_testing_benchmarking/` | JUnit mental model, Mockito mental model, JMH benchmarking |
 
-| # | Folder | Topics |
-|---|---|---|
-|06|`12_io_json_cli/`|File IO, NIO, JSON parsing, small CLI |
-|07|`13_memory_management/`|References, pass-by-value, object lifecycle, `equals` vs `==`, `hashCode`, `clone`, mutable/immutable, `final`, weak/soft references, **memory leaks** (moved from JVM)|
-|07|`14_jvm/`|Class loader, bytecode, heap, stack, garbage collection/GC, metaspace, JIT, escape analysis|
-|08|`15_multithreading/`|Thread, `ExecutorService`, `CompletableFuture`, Thread vs ExecutorService vs CompletableFuture comparison, `synchronized`, `volatile`|
-|09|`16_networking/`|TCP, HTTP, HTTPS, sockets, serialization, Java HTTP Client, `URLConnection`, REST/gRPC client basics|
-|10|`17_logging/`|SLF4J, Logback, MDC, structured/JSON logging, correlation IDs|
-|11|`18_testing/`|JUnit, Mockito, benchmarking|
+# 2_spring_boot
 
-## Phase 2 — `2_spring/`
+## 00_spring
 
-| # | Folder | Topics |
-|---|---|---|
-|00|`00_overall/`|Spring architecture|
-|01|`01_ioc_di/`|IoC, Dependency Injection — **owns this topic**|
-|02|`02_beans/`|Bean lifecycle, bean scope|
-|03|`03_annotations/`|`@Component`, `@Service`, `@Repository`|
-|04|`04_configuration/`|Configuration, profiles, properties|
-|05|`05_rest_api/`|Controllers, request mapping; links to `1_core_java/09_exception_handling` via `@ControllerAdvice`|
-|06|`06_validation/`|Validation API|
-|07|`07_transactions/`|`@Transactional`|
+| Folder | Topics |
+|---|---|
+| `s00withoutspring/` | Plain Java wiring before Spring |
+| `s01manualconfig/` | Manual Spring configuration with `@Configuration` and `@Bean` |
+| `s02autoconfig/` | Component scanning and automatic bean discovery |
+| `s03diresolution/` | Dependency injection resolution, multiple implementations, `@Primary`, `@Qualifier` |
+| `s04mvcarchitecture/` | Controller, service, repository, model, layered architecture |
+| `s05beanlifecycle/` | Bean creation, initialization, destruction, scopes, lifecycle callbacks |
+| `s06configurationandenv/` | Configuration, environment, properties, YAML, profiles |
+| `s07aopandproxies/` | AOP, proxies, aspects, advice, pointcuts, self-invocation concepts |
+| `s08validation/` | DTO validation with `@Valid`, validation annotations, validation error formatting |
+| `s09transactions/` | `@Transactional`, transaction boundaries, propagation, rollback behavior |
+| `s10events/` | Application events, publishers, listeners, `@EventListener` |
 
-## Phase 3 — `3_spring_boot/`
+## spring_boot
 
-| # | Folder | Topics |
-|---|---|---|
-|00|`00_overall/`|Boot architecture, standard project layout|
-|01|`01_rest_crud/`|CRUD APIs|
-|02|`02_database/`|Spring Data JPA, Hibernate|
-|03|`03_configuration_logging/`|`application.yml`; links to `1_core_java/17_logging`|
-|04|`04_testing/`|Spring/Boot integration testing only — links to `1_core_java/16_testing`|
-|05|`05_grpc/`|gRPC with Spring|
-|06|`06_swagger/`|OpenAPI|
-|07|`07_actuator/`|Monitoring|
-|08|`08_security_jwt/`|Spring Security + JWT + OAuth2 — **owns security for the whole roadmap**|
+| Milestone | Build                                         | Depth         |
+| --------- | --------------------------------------------- | ------------- |
+| `01`      | Basic CRUD REST API                           | **Deep**      |
+| `02`      | DTOs + validation + global exception handling | **Deep**      |
+| `03`      | PostgreSQL + JPA/Hibernate                    | **Very Deep** |
+| `04`      | Relationships + query optimization + N+1      | **Very Deep** |
+| `05`      | Checkout/order workflow + transactions        | **Very Deep** |
+| `06`      | Concurrent operations + locking + isolation   | **Very Deep** |
+| `07`      | Unit + integration + Testcontainers           | **Deep**      |
+| `08`      | JWT authentication + RBAC                     | **Very Deep** |
+| `09`      | Async processing + executors                  | **Deep**      |
+| `10`      | Logging + metrics + tracing                   | **Deep**      |
+| `11`      | gRPC internal service                         | **Medium**    |
+| `12`      | OpenAPI documentation                         | **Shallow**   |
 
-## Phase 4 — `4_tools/`
+# 3_tools
 
-| # | Folder | Topics |
-|---|---|---|
-|01|`01_postgresql/`|Indexes, transactions, `EXPLAIN ANALYZE`, isolation levels — every Java backend interview expects this|
-|02|`02_redis/`|Caching, pub/sub, distributed locks|
-|03|`03_kafka/`|Producer, consumer, offsets, DLQ|
-|04|`04_rabbitmq/`|Exchange, queue, routing|
-|05|`05_opentelemetry/`|Tracing, metrics, logs (fast pass — already run this in prod on Rust)|
-|06|`06_docker/`|Compose, networking, images|
-|07|`07_nginx/`|Reverse proxy|
+| Folder | Topics |
+|---|---|
+| `01_postgresql/` | Tables, indexes, transactions, isolation levels, `EXPLAIN ANALYZE` |
+| `02_redis/` | Caching, TTL, pub/sub, distributed locks |
+| `03_kafka/` | Producers, consumers, topics, partitions, offsets, consumer groups, DLQ |
+| `04_rabbitmq/` | Exchanges, queues, routing keys, acknowledgements, retries |
+| `05_opentelemetry/` | Traces, metrics, logs, context propagation |
+| `06_docker/` | Images, containers, volumes, networks, Docker Compose |
+| `07_nginx/` | Reverse proxy, load balancing basics, TLS termination |
