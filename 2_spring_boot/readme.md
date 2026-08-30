@@ -18,17 +18,17 @@
 
 ## spring_boot
 
-| Milestone | Build                                         | Depth         |
-| --------- | --------------------------------------------- | ------------- |
-| `01`      | Basic CRUD REST API                           | **Deep**      |
-| `02`      | DTOs + validation + global exception handling | **Deep**      |
-| `03`      | PostgreSQL + JPA/Hibernate                    | **Very Deep** |
-| `04`      | Relationships + query optimization + N+1      | **Very Deep** |
-| `05`      | Checkout/order workflow + transactions        | **Very Deep** |
-| `06`      | Concurrent operations + locking + isolation   | **Very Deep** |
-| `07`      | Unit + integration + Testcontainers           | **Deep**      |
-| `08`      | JWT authentication + RBAC                     | **Very Deep** |
-| `09`      | Async processing + executors                  | **Deep**      |
-| `10`      | Logging + metrics + tracing                   | **Deep**      |
-| `11`      | gRPC internal service                         | **Medium**    |
-| `12`      | OpenAPI documentation                         | **Shallow**   |
+| Milestone | Build                                         |
+| --------- | --------------------------------------------- |
+| `01`      | Basic CRUD REST API                           |
+| `02`      | DTOs + validation + global exception handling |
+| `03`      | PostgreSQL + JPA/Hibernate                    |
+| `04`      | Relationships + query optimization + N+1      |
+| `05`      | Checkout/order workflow + transactions        |
+| `06`      | Concurrent operations + locking + isolation   |
+| `07`      | Unit + integration + Testcontainers           |
+| `08`      | JWT authentication + RBAC                     |
+| `09`      | Async processing + executors                  |
+| `10`      | Logging + metrics + tracing                   |
+| `11`      | gRPC internal service                         |
+| `12`      | OpenAPI documentation                         |
