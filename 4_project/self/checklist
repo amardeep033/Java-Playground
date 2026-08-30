@@ -1,0 +1,41 @@
+1. Scope
+- svix like webhook delivery
+- workflow and executor
+- load test for api
+
+2. Tools
+- redis
+- rabbitmq
+- otel
+- grpc?
+- rust? Delivery worker in rust and event service in spring? afterwards maybe??
+- follow lld pattern
+
+3. Concepts
+- idempotency
+- all 3 mech : orch, callback, event
+- rerty policies
+- cache policies
+- rate limiter + circuit breaker
+- api key -- for service
+- auth session + cookies + jwt --- for human --- rbac
+- metrics
+- cqrs + projection
+- ddd + clean arch
+- outbox pattern + dlq
+- migration, cdc, upload, config, proto/pq visual, json comp, s3 minio, lineage, otel assistant?
+
+4. DB
+- postgres --- initially only this
+- clickhouse
+
+5. host
+- nginx
+- cloud
+- docker
+
+6. extension
+- rag --- help bot
+- screen
+
+#curl for source and ngrok/webhook.site for destination

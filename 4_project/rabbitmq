@@ -1,0 +1,11 @@
+  EP[Outbox publisher] -->|er.events / event.accepted| EIN[events.in]
+  EP -->|er.events / app.upserted| ASYNC[apps.sync]
+  EIN --> FO[Fan-out consumer]
+  FO -->|er.delivery / deliver| MAIN[delivery.main]
+  MAIN --> W[Worker]
+  W -->|retry.10s / 1m / 10m / 1h| RQ[retry tier queues<br/>fixed TTL each]
+  RQ -->|TTL expires, DLX| MAIN
+  W -->|dead| DLQ[delivery.dlq<br/>audit copy]
+  EIN -. reject .-> POI[dlq.poison]
+  MAIN -. reject .-> POI
+  DLQ -. "redrive = API call, not queue move" .-> MAIN

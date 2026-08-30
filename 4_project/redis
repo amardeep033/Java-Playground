@@ -1,0 +1,5 @@
+| `rl:ingest:{app_id}` | token bucket (Lua) | ingest rate limit |
+| `rl:ep:{endpoint_id}` | token bucket (Lua) | per-endpoint send rate |
+| `cc:ep:{endpoint_id}` | counter with TTL | per-endpoint concurrency cap |
+| `cb:{endpoint_id}` | hash: `state, failures, open_until, cooldown_ms` | circuit breaker |
+| `cb:probe:{endpoint_id}` | string, `SET NX EX 30` | single half-open probe |

@@ -1,0 +1,35 @@
+1. read
+2. debate
+3. trim --- phase (w/o redis, w/o rabbitmq, serv1, serv2)
+4. ask to write : phase wise
+
+Why not use one listener?
+Imagine one event needs to be delivered to 1,000 customer endpoints.
+- With separate listeners: A can fan out the event into 1,000 delivery tasks. B processes those tasks concurrently, subject to endpoint rate limits and concurrency caps.
+- With one combined listener: event processing and outbound HTTP calls would be coupled. Slow or unresponsive customer endpoints could occupy consumers and delay processing of new incoming events.
+
+Service 1 (Event Service)
+        |
+        v
+      RabbitMQ
+        |
+        | events.in
+        v
+Service 2 (Delivery Service)
+        |
+        +-- Listener A: Fan-out
+        |      |
+        |      +--> Store event and create delivery records
+        |      |
+        |      +--> Publish DeliverWebhook messages
+        |                    |
+        |                    v
+        |                 RabbitMQ
+        |               delivery.main
+        |                    |
+        |                    v
+        +-- Listener B: Delivery workers
+                       |
+                       +--> Apply per-endpoint controls
+                       +--> Send HTTP webhook
+                       +--> Record result / schedule retry

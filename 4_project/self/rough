@@ -1,0 +1,62 @@
+Note: these all are for negative rare path, and not normal 
+
+---------------------------------------------------------------------------------------------------------
+
+app sends req ----> dont wait as n service like banks involved can delay -- dont retry even though idempotent as loop=latency(unnecessary)
+// there are other events also like  refund, dispute, chargeback or reversal which requires callback
+--------
+
+pay rcvs & sends pending back
+outbox write done ----> sender cant be in same
+pub service (cdc/poll) ----> polling brings latency
+rabbitmq -------> not pub direct export because (loop still blocks) + if multiple instance Kafka(Consumer group) vs RabbitMQ(Shared queue)
+exporter service
+
+--------our proj host(nginx/docker/signed) under 1500(they dont build inhouse because mainatinance)--------later api playground app +++ rag -------
+
+svix rcvs ---- rest + apikey /jwt/nginx + should be idempotent/rate /circuitbreaker -- redis(fast, counter, concurrency, temp)
+outbox write ----> sender cant be in same
+cdc/poll ----> polling brings latency
+rabbitmq -------> grpc + not pub direct export because (loop still blocks, coordination) + if multiple instance Kafka(Consumer group) vs RabbitMQ(Shared queue) + dlq
+sender -------> rest + hot path as cust server can be down / circuitbreaker (n executor service)
+
+--------
+
+app rcvs back ---- should be idempotent as atleast once delivery
+
+---------------------------------------------------------------------------------------------------------
+
+tables(keep cqrs in mind) and flow list 
+//we got two services and dbs:
+ 1.Event Service: service, outbox, publisher AND 
+ 2. Delivery Service: consumer, worker
+
+
+0. prereq: registration of source, events, dest, delivery - postgres
+1. we get req 
+2. 
+
+
+// app - dashboard - otel - clickhouse
+// replay + playground + 
+
+---------------------------------------------------------------------------------------------------------
+
+//fail at any point -- works on atleast once -- so everything idempotency key
+1. sender using cdc/poll reads and sends it to rabbitmq and mark in db as published
+2. rabbitmq(own server - disk/in mem - durable) routes and delivers but still keep in queue unless ack(deletes on ack)
+3. rcvr + Bounded in-process work queue -- ACK to RabbitMQ, after successful processing
+
+//phase1 : polling
+
+---------------------------------------------------------------------------------------------------------
+rabbitmq has three queues: main(we only hear main) , retry(rabbitmq moves to main using TTL and dead-letter exchange (DLX) routing) and dlq(manual move to main by re-raising)
+ready -> Unacked -> 
+ACK (only after sending)
+NACK + requeue=true --- instant but main queue therefore ack main and put self in retry
+NACK + requeue=false --- failed
+Redelivered --- means second time coming and not idempotency which is executed
+Dead-lettered --- retry exhausted
+- circuit breaker: at customer endpoint level, whereas dlq at event level
+
+//no retry unless consumer disconnected or 30min passed or 

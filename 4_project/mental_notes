@@ -1,0 +1,63 @@
+1. rcv - work - send
+2. now if 'work+send' is latency(external app pay interface, our webhook service) -- i need separate worker
+3. that worker can be separate service or separate thread in same service
+4. to call that service -- i have two option -- event(with outbox) or callback(coupling - code change, retry/fail, slow/block main req rcvr)
+5. so total four comb: sep thread + event, sep thread + callback, sep serv + event, sep serv + callback
+6. now lets take example of payment -- n services easy scale 
+
+
+------------------
+
+1. service a -> rabbitmq -> service b
+2. no service c(acting as bff --- even the status of delv), all human call to service a(even the status of delv) -- so no auth in service b(no table like app *ref -- also for disable handling)
+3. service a : n thread + 1 poller(but design in such a way that can be 2 using claim)
+4. service b : n thread -- listen and does (any one block -- other listens) --- scale service b itself(better scaling)
+5. this service b : can also have two other ways too : n listen + m worker (separate in-memory queue is required) -- and -- n listener, m listener (Fast event processing, Slow network calls are isolated, Independent scaling and backpressure -- No separate in-memory queue is required by the two-stage design either -- additional buffering and scaling boundary)
+6. redis : Ingestion rate limiter, (serviceB req??) Endpoint send rate limiter and concurrency cap(set by user - subs - max by us), Circuit breaker
+7. rabbitmq : 
+
+------------------
+
+think about 1 event to n cust perspective
+think about what should happen on diable: -- not only about pending but also about future -- who maintains events
+1. endpoint disable: store new but dont send, pause the one in progress -- and once enabled -- can be re sent
+2. event disable: skip new, send in progress -- and on  re enable nothing happens
+3. app disable: skip new, send in progress -- and on  re enable nothing happens
+
+*A projection is a smaller, local representation of data owned by another service -- updated through AppUpserted
+
+------------------
+
+human paths:
+1. Replay
+2. Redrive
+3. Test delivery
+
+------------------
+
+- if we have status through service a -- kind of bff -- and this requires sync call --- but it is said sync coupling is fine, async not
+- bff term is wrong since -- its tailor made for specific frontend -- not only comm w 2 service and aggr result?
+- Can Service B use one thread for status APIs? Yes, but I wouldn't create a dedicated single thread just for status APIs by default.
+
+------------------
+
+- nginx -- both service -- so regex and routing table(which api call goes to which service)
+- in app side which api?
+
+------------------
+
+serv A to serv B
+- App changes → AppUpserted
+- Accepted event → EventAccepted
+- endpoint-management API
+
+-----------------
+
+- poison msg: retain + alert + 
+- circuit breaker : through redis(temp) - only at endpoint level
+- rate limit : both concurrency and rate limit needed -- because what if 10 concurrent takes 1ms but so in a sec bombarded
+
+------------------
+
+check rabbit mq config -- n listen pool
+check redis config 

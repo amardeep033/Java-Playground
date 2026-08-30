@@ -1,0 +1,69 @@
+EventRelay — What users can do in the UI
+1. Account and application setup
+Register themselves and log in.
+Create an application (e.g., Acme CRM).
+Generate, rotate, and revoke API keys.
+Manage application settings and rate limits.
+
+2. Webhook management
+Register a webhook URL using a form.
+Select event types to subscribe to (e.g., user.created, report.generated).
+Configure a webhook signing secret.
+Enable, disable, edit, or delete a webhook.
+Send a test webhook to verify the endpoint.
+
+3. Event ingestion
+Submit a test event through a form or API.
+View the event payload, event type, timestamp, and event ID.
+See which webhooks match the event.
+Check the event's processing status.
+
+4. Delivery monitoring
+View all webhook deliveries in a searchable, filterable table.
+Filter by application, webhook, event type, status, and date range.
+Open a delivery to inspect its payload, response status, latency, and error.
+View the full attempt history, including timestamps and retry reasons.
+Manually retry a failed delivery.
+Replay an old event to selected webhooks.
+
+5. Reliability and failure management
+View deliveries waiting for retry.
+Inspect permanently failed deliveries.
+Browse dead-lettered messages or failed jobs.
+Retry or redrive eligible failures.
+Pause and resume a webhook.
+Configure retry policies and maximum attempts.
+
+6. API usage and rate limits
+View request counts and rate-limit usage.
+See rejected requests and HTTP 429 responses.
+Configure per-application rate limits, subject to account permissions.
+Inspect API authentication failures.
+
+7. Analytics dashboard
+Total events received.
+Successful, failed, pending, and retrying deliveries.
+Webhook success rate.
+Average and P95/P99 delivery latency.
+Retry counts and top failure reasons.
+Event ingestion rate and delivery throughput.
+
+8. Security and access control
+Log in with JWT-based authentication.
+Manage team members and roles: Admin, Operator, Viewer.
+View API key metadata and last-used timestamps.
+Rotate webhook signing secrets.
+Audit important actions, such as key rotation and manual retries.
+
+9. Observability and operations
+Search events and deliveries by correlation ID or event ID.
+View distributed trace links for a delivery.
+Inspect service errors and latency.
+View RabbitMQ queue depth and consumer health.
+Monitor worker throughput and retry backlog.
+
+10. Platform administration
+View registered applications and their usage.
+Suspend or reactivate applications.
+Inspect system-wide delivery failures.
+Manage global rate limits and operational settings.
