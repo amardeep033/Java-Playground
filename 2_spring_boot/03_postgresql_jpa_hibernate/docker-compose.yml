@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: spring_boot_product_postgres
+    environment:
+      POSTGRES_DB: productdb
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - product_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  product_postgres_data:
