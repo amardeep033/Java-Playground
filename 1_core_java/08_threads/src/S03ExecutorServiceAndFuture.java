@@ -7,6 +7,8 @@ public class S03ExecutorServiceAndFuture {
     public static void main(String[] args) throws Exception {
 
         // 0. Create a pool of two worker threads.
+        // This bounds the number of worker threads to 2.
+        // A truly bounded thread pool also limits queued tasks, usually by using ThreadPoolExecutor with a bounded queue.
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         // 1. execute() accepts Runnable and is fire-and-forget -- no Future is returned.

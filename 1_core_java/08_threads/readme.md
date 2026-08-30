@@ -25,6 +25,7 @@
 | 4.2 | ExecutorService | `e.shutdown()` | Stop accepting new tasks; submitted tasks continue. | `S03ExecutorServiceAndFuture.java` | [2.5](#25-threadpoolexecutor-internals) |
 | 4.3 | ExecutorService | `e.shutdownNow()` | Attempts interruption and returns queued tasks. | `S03ExecutorServiceAndFuture.java` | [2.5](#25-threadpoolexecutor-internals) |
 | 4.4 | ExecutorService | ThreadPoolExecutor internals | Core size, max size, queue, rejection policy. | comments/readme | [2.5](#25-threadpoolexecutor-internals) |
+| 4.5 | ExecutorService | Bounded thread pool | Limits worker threads and queued tasks to control resource usage. | comments/readme | [2.5](#25-threadpoolexecutor-internals) |
 | 5 | Future | `f.get()` | Blocks caller until result/cancel/failure. | `S03ExecutorServiceAndFuture.java` | [2.5](#25-threadpoolexecutor-internals) |
 | 5.1 | Future | `f.isDone()` | Checks whether task completed/cancelled/failed. | `S03ExecutorServiceAndFuture.java` | [2.5](#25-threadpoolexecutor-internals) |
 | 5.2 | Future | `f.cancel(true)` | Requests cancellation and may interrupt running task. | `S03ExecutorServiceAndFuture.java` | [2.5](#25-threadpoolexecutor-internals) |
@@ -151,10 +152,11 @@ submit task
 | 2.5.3 | `workQueue` | Holds tasks waiting for a worker. |
 | 2.5.4 | Unbounded queue | Usually prevents growth beyond core size, so max size may not matter. |
 | 2.5.5 | Bounded queue | Allows back pressure and makes max size/rejection behavior visible. |
-| 2.5.6 | `AbortPolicy` | Throws `RejectedExecutionException`. |
-| 2.5.7 | `CallerRunsPolicy` | Caller thread runs task; slows submitter and creates back pressure. |
-| 2.5.8 | `DiscardPolicy` | Drops rejected task silently. |
-| 2.5.9 | `DiscardOldestPolicy` | Drops oldest queued task and retries submission. |
+| 2.5.6 | Bounded thread pool | Bounded because you limit the number of worker threads and the number of queued tasks. |
+| 2.5.7 | `AbortPolicy` | Throws `RejectedExecutionException`. |
+| 2.5.8 | `CallerRunsPolicy` | Caller thread runs task; slows submitter and creates back pressure. |
+| 2.5.9 | `DiscardPolicy` | Drops rejected task silently. |
+| 2.5.10 | `DiscardOldestPolicy` | Drops oldest queued task and retries submission. |
 
 ### 2.6 CompletableFuture Internals
 
@@ -247,5 +249,6 @@ submit task
 | Can race condition happen without data race? | Yes. Separate synchronized methods can still form a non-atomic check-then-act sequence. |
 | What are the four deadlock conditions? | Mutual exclusion, hold-and-wait, no preemption, circular wait. |
 | How do you prevent deadlock with locks? | Use consistent lock ordering, avoid nested locks, or use `tryLock()` with timeout. |
+| What is a bounded thread pool? | A pool where you limit the number of worker threads and queued tasks, so load is controlled instead of growing forever. |
 | What is thread pool starvation deadlock? | A task waits for another task submitted to the same bounded pool, but all workers are already blocked. |
 | Best choice for bounded worker producer-consumer problem? | `BlockingQueue` plus fixed/bounded executor plus proper shutdown/interruption handling. |
