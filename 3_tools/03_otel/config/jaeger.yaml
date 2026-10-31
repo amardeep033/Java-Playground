@@ -1,0 +1,44 @@
+# Jaeger v2 embeds OTel Collector components: one receiver, two pipelines.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+
+processors:
+  batch:
+    timeout: 1s
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: memory
+  debug/logs:
+    verbosity: detailed
+    use_internal_logger: false
+    output_paths: [.run/otel-logs.log]
+
+extensions:
+  jaeger_storage:
+    backends:
+      memory:
+        memory:
+          max_traces: 10000
+  jaeger_query:
+    storage:
+      traces: memory
+    http:
+      endpoint: 127.0.0.1:16686
+
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug/logs]

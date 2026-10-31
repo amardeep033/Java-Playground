@@ -58,4 +58,3 @@
 | `01_rabbitmq/` | Exchanges, queues, routing keys, acknowledgements, retries |
 | `02_redis/` | Caching, TTL, pub/sub, distributed locks |
 | `03_opentelemetry/` | Traces, metrics, logs, context propagation |
-| `04_nginx/` | Reverse proxy, load balancing basics, TLS termination |
