@@ -1,0 +1,93 @@
+why:
+- sde3 switch
+- to put in resume
+- to host publicly for them to see and give demo during interview
+- thus limited scope
+- and hosting cost within rs 2k per month
+- this project all three communication : rest(sync), event(async), callback covered
+- all imp hld concepts covered with proper lld and solid principles
+- both rest and grpc api covered
+
+about:
+- something similar to svix
+- name of project: "event relay"
+
+tools:
+- redis
+- opentel + prometheus + grafana
+- rabbitmq
+- postgres
+- react
+- spring boot
+- rest api(screen or customer to service1) and grpc api(service1 calling service2 for missed updates) and rabbitmq event(service1 to service2 webhook events and service2 to service1 updates)
+
+checklist:
+- nginx configuration
+- circuit breaker for endpoint
+- rate limiter based on app, endpoint for service 1 reciever
+- rate limit and concurrency on endpoint for consumer
+- event driven using rabbitmq and for clearing outbox we will use loop
+- idempotency handling at both service level
+- metrics(p95 and counters), traces and logs using opentelemetry, prometheus and grafana
+- follow lld patterns(like state machine) and solid principles
+
+arch: 
+- there will be two service here
+- both service will be spring boot based
+- both service will have their own db schema
+- both service will communicate through rabbitmq
+- wherever spring cache with redis provider is enough, we will use it, otherwise we will use direct redis
+- projection table for fast reads and cqrs pattern will be followed
+- dont overcomplicate things like pausing the ones which are already in queue, let them be processed and then pause the endpoint, same for disabling and expiring which applies only for new deliveries (so basically user can disable app, endpoint or event and it will not affect the ones which are already in queue -- re enable nothing happens)
+- we will have three rabbitmq queues: main(only listen this), retry(proper delayed retry policy) and dlq(permanent or retry exhausted)
+- cache lru and ttl, basically proper cache policies will be followed
+
+admin:
+- manage apps, endpoints and receivers
+- manage logs and telemetry
+
+user: (through ui)
+- register self, app, endpoints and receivers
+- replay dlq messages
+- can create a event through form, test endpoints using webhook --- ngrok/webhook.site
+- delivery monitoring: view status of delivery and view metrics
+- Generate, rotate, and revoke API keys, manage application settings like deactivate and rate limits, configure a webhook signing secret 
+
+service1: "receiver service"
+- m http thread(rest) for recieving event from customer and UI apis + n rabbitmq listener threads for status update from service2 + 1 loop thread for clearing outbox
+- all ui api will be in this service (kind of bff but bff term is wrong since -- its tailor made for specific frontend)
+
+service2: "delivery service"
+- n rabbitmq listener threads for events from service1 and delivery to consumer + m http thread(grpc) for exposing status api for service1 + 1 loop thread for clearing outbox
+- delivery will be done by this service and same thread working as listener and worker
+- on completion of delivery, it will write to own db as well as raise event to service 1 for status update
+- it exposes grpc api for service 1 to get updates of missed rabbitmq events, in case service 1 was down and missed the event
+- sends delivery with idempotent key to consumer but consumer can choose to ignore it
+
+first phase:
+- service 1 idempotency handling + rabbit mq + db
+- service 2 idempotency handling + rabbit mq + db
+- service 1 redis cache + rate limiter
+- service 2 redis cache + rate limiter
+- service 1 otel + prometheus + grafana
+- service 2 otel + prometheus + grafana
+- enhancement like circuit breaker, rate limiter, , dlq and manual replay
+
+second phase:
+- ui: (jwt session + cookies + rbac) + react 
+- hosting : docker + nginx + cloud
+- give policy decision to user for stuff like what should happen on enabling the disabled endpoint, app or event and so on
+
+third phase:
+- ai / rag
+- clickhouse
+- rust 
+- cdc instead of loop for clearing outbox and kafka
+
+reasoning:
+- first of all, below all points are for handling negative scenarios and not for happy path
+- why people use callback -- because n services included can take time and cant wait for all, cant timeout and retry even though idempotent because thats bad for audit and loop causes latency + there are other events also like  refund, dispute, chargeback or reversal which requires callback
+- why split in two services -- scaling and also because what if some endpoint is slow -- then receiver service impacted
+- why rabbitmq -- because we dont want to again couple service a and service b(what if service b slow or down), due to same reason as why two service because endpoint can be down or slow
+- outbox pattern because msg and db query in one transaction and for clearing as separate thread in service 1 because we dont want to block main thread and also because we can have multiple threads for sending events to rabbitmq -- we can argue here that loop brings latency 
+- we can argue that in service 2 also have two threads for recieving and sending, but that just bring complexity and we can easily scale service 2 itself, so we can have n threads for listening and sending events to consumer
