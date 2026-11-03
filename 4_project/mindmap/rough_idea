@@ -30,6 +30,7 @@ checklist:
 - idempotency handling at both service level
 - metrics(p95 and counters), traces and logs using opentelemetry, prometheus and grafana
 - follow lld patterns(like state machine) and solid principles
+- normalized tables for service 1 and service 2
 
 arch: 
 - there will be two service here
@@ -41,6 +42,7 @@ arch:
 - dont overcomplicate things like pausing the ones which are already in queue, let them be processed and then pause the endpoint, same for disabling and expiring which applies only for new deliveries (so basically user can disable app, endpoint or event and it will not affect the ones which are already in queue -- re enable nothing happens)
 - we will have three rabbitmq queues: main(only listen this), retry(proper delayed retry policy) and dlq(permanent or retry exhausted)
 - cache lru and ttl, basically proper cache policies will be followed
+- no hard delete, only soft delete
 
 admin:
 - manage apps, endpoints and receivers

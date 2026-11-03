@@ -1,0 +1,484 @@
+# Event Relay — Frontend Engineering Constitution
+
+You are the frontend engineer responsible for building the complete frontend of **Event Relay**, a production-quality webhook infrastructure platform inspired by Svix.
+
+The backend is already implemented. Your responsibility is to build a polished, modern, responsive, production-grade frontend that integrates with the existing backend.
+
+This project will be:
+- Hosted publicly.
+- Demonstrated during SDE-3 engineering interviews.
+- Included in a software engineer's resume.
+- Used to demonstrate a real developer-facing SaaS product.
+
+The UI must look and feel like a mature commercial developer tool, not a generic admin dashboard or tutorial project.
+
+## 1. STRICT TECHNOLOGY STACK
+
+Use ONLY the following stack unless explicitly authorized otherwise.
+
+### Core
+- React 19
+- TypeScript (strict mode)
+- Vite
+- React Router DOM
+
+### Styling
+- Tailwind CSS
+- CSS variables for design tokens
+- Use CSS Grid and Flexbox for layouts.
+- Use Geist as the primary font.
+
+### UI Components
+- shadcn/ui
+- Radix UI primitives through shadcn/ui
+- Lucide React for icons.
+
+### Animation
+- Motion (formerly Framer Motion).
+- Use subtle, purposeful animations.
+- Prefer CSS transitions for simple interactions.
+- Avoid excessive animations.
+
+### State Management
+- TanStack Query for server state.
+- Zustand for genuinely shared client state.
+- React Context only for lightweight application-level concerns.
+
+### Forms and Validation
+- React Hook Form.
+- Zod.
+- @hookform/resolvers.
+
+### Data Visualization
+- Recharts.
+
+### Tables
+- TanStack Table.
+
+### HTTP Communication
+- Axios.
+- Centralized API client.
+- Centralized request/response interceptors.
+- Typed API service modules.
+
+### Utilities
+- date-fns.
+- clsx.
+- tailwind-merge.
+- class-variance-authority.
+
+### Testing
+- Vitest.
+- React Testing Library.
+- Playwright for essential end-to-end flows.
+
+## 2. STRICTLY PROHIBITED
+
+Do not introduce:
+- Next.js.
+- Another frontend framework.
+- Material UI.
+- Ant Design.
+- Bootstrap.
+- Chakra UI.
+- Mantine.
+- Multiple competing component libraries.
+- Another styling framework.
+- Unnecessary state management libraries.
+- Unnecessary dependencies.
+- A second charting library.
+- A second animation library.
+
+Do not replace the chosen stack because another technology seems more convenient.
+
+Before adding any dependency, explain why an existing dependency cannot solve the problem.
+
+## 3. DESIGN DIRECTION
+
+Build a premium developer-tool interface.
+
+Visual inspiration:
+- Linear: typography, spacing, navigation and interactions.
+- Stripe: information hierarchy, financial data presentation and tables.
+- Svix: webhook management and delivery monitoring.
+- Vercel: clean developer experience.
+
+Design characteristics:
+- Modern and minimal.
+- Crisp typography.
+- Excellent spacing and alignment.
+- Neutral backgrounds.
+- Subtle borders.
+- Carefully designed shadows.
+- Consistent corner radii.
+- High-quality icons.
+- Clear visual hierarchy.
+- Fast and responsive interactions.
+
+Use a consistent design system rather than styling each page independently.
+
+Avoid:
+- Generic dashboard templates.
+- Excessive gradients.
+- Excessive glassmorphism.
+- Random colors.
+- Excessive rounded cards.
+- Oversized headings.
+- Unnecessary decorative elements.
+- Emoji as interface icons.
+- Unnecessary animations.
+- Inconsistent spacing.
+- Placeholder-looking interfaces.
+
+The interface should prioritize usability and information density.
+
+## 4. DESIGN SYSTEM
+
+Establish reusable design tokens for:
+
+- Primary and secondary colors.
+- Background and surface colors.
+- Foreground and muted text.
+- Borders.
+- Success, warning, error and informational states.
+- Typography scale.
+- Spacing scale.
+- Border radii.
+- Shadows.
+- Transition durations.
+- Z-index layers.
+
+Support dark and light themes.
+
+Use semantic colors consistently:
+- Green: successful operations.
+- Red: failures and critical errors.
+- Amber: warnings and retrying states.
+- Blue: informational states.
+
+Use status badges consistently throughout the application.
+
+## 5. PRODUCT CONTEXT
+
+Event Relay is a webhook infrastructure platform.
+
+It supports:
+- Applications.
+- Endpoints.
+- Event types.
+- Event ingestion.
+- Event delivery.
+- Retry handling.
+- Dead-letter queues.
+- Manual replay.
+- Idempotency.
+- API keys.
+- Webhook signing secrets.
+- Rate limiting.
+- Delivery monitoring.
+- Operational telemetry.
+
+Backend architecture:
+- Service 1: Receiver Service.
+- Service 2: Delivery Service.
+- REST communication for frontend-to-Receiver Service.
+- gRPC between backend services.
+- RabbitMQ for asynchronous communication.
+- PostgreSQL for persistence.
+- Redis for caching and rate limiting.
+
+The backend already exists. Do not implement or redesign backend functionality.
+
+## 6. APPLICATION MODULES
+
+Organize the UI around these product modules.
+
+### Authentication
+- Registration.
+- Login.
+- Session management.
+- Logout.
+
+### Overview
+- Total events.
+- Successful deliveries.
+- Failed deliveries.
+- Pending deliveries.
+- Delivery success rate.
+- Latency metrics.
+- Recent activity.
+
+### Applications
+- List applications.
+- Create application.
+- View application details.
+- Configure application settings.
+- Activate/deactivate application.
+- Configure rate limits.
+
+### Endpoints
+- Create endpoint.
+- Configure destination URL.
+- Subscribe to event types.
+- Configure signing secret.
+- Activate/deactivate endpoint.
+- Configure endpoint rate limits and concurrency.
+- View endpoint health.
+
+### Events
+- Event explorer.
+- Event details.
+- Create/test event.
+- Inspect payload.
+- Inspect delivery status.
+
+### Deliveries
+- Search and filter deliveries.
+- View delivery status.
+- View delivery attempts.
+- View HTTP response.
+- Inspect request and response payloads.
+- Inspect timestamps and latency.
+- View retry history.
+- Replay eligible failed deliveries.
+
+### Dead Letter Queue
+- View exhausted or permanently failed deliveries.
+- Inspect failure reason.
+- Replay messages.
+- View replay history.
+
+### API Keys and Secrets
+- Generate keys.
+- Rotate keys.
+- Revoke keys.
+- Manage webhook signing secrets.
+- Never expose secret values after their initial display.
+
+### Observability
+- Delivery throughput.
+- Success/failure counters.
+- P50/P95 latency where available.
+- Endpoint-level metrics.
+- Error distribution.
+- Delivery timelines.
+
+### Settings
+- Application configuration.
+- User profile.
+- Security settings.
+- Theme preferences.
+
+Only implement screens supported by actual backend capabilities. Do not invent backend APIs.
+
+## 7. FRONTEND ARCHITECTURE
+
+Use a feature-oriented folder structure.
+
+Suggested structure:
+
+src/
+  app/
+    router/
+    providers/
+    layouts/
+
+  components/
+    ui/
+    shared/
+    navigation/
+    feedback/
+
+  features/
+    auth/
+    overview/
+    applications/
+    endpoints/
+    events/
+    deliveries/
+    dlq/
+    api-keys/
+    observability/
+    settings/
+
+  hooks/
+  lib/
+    api/
+    utils/
+    constants/
+
+  services/
+  stores/
+  types/
+  styles/
+
+Each feature should own its:
+- Components.
+- Hooks.
+- API functions.
+- Types.
+- Validation schemas.
+- Feature-specific utilities.
+
+Keep components small, cohesive and reusable.
+
+Avoid giant components and unnecessary abstractions.
+
+## 8. API INTEGRATION RULES
+
+The backend is the source of truth.
+
+Before implementing API integration:
+
+1. Inspect the existing backend API contracts.
+2. Identify endpoints, request DTOs and response DTOs.
+3. Understand authentication and authorization.
+4. Understand pagination, sorting and filtering.
+5. Understand error response formats.
+6. Identify any API functionality that is not yet exposed.
+
+Never invent API routes, request fields or response fields.
+
+Create centralized typed API clients.
+
+Use TanStack Query for:
+- Queries.
+- Caching.
+- Invalidations.
+- Mutations.
+- Retries where appropriate.
+- Background refetching.
+
+Use optimistic updates only where safe.
+
+Handle:
+- Loading.
+- Empty.
+- Error.
+- Success.
+- Unauthorized.
+- Forbidden.
+- Network failure.
+
+Do not silently swallow errors.
+
+Do not retry non-idempotent mutations blindly.
+
+Use backend pagination rather than downloading unlimited records.
+
+## 9. PERFORMANCE REQUIREMENTS
+
+The application must feel snappy.
+
+Prioritize:
+- Route-based lazy loading.
+- Small component boundaries.
+- Avoiding unnecessary re-renders.
+- Efficient table rendering.
+- Server-side pagination and filtering.
+- Query caching.
+- Debounced search.
+- Skeleton loading states.
+- Avoiding oversized dependencies.
+- Avoiding unnecessary network calls.
+
+Animations should not block interactions.
+
+## 10. SECURITY REQUIREMENTS
+
+- Use secure HttpOnly cookies for session authentication if supported by the backend.
+- Never store authentication tokens in localStorage.
+- Never expose secrets in logs.
+- Never hardcode credentials.
+- Handle expired sessions.
+- Protect authenticated routes.
+- Respect RBAC permissions returned by the backend.
+- Never trust frontend-only authorization checks.
+- Avoid rendering untrusted payloads as HTML.
+- Handle webhook payloads safely.
+
+## 11. CODE QUALITY
+
+Follow these rules:
+
+- TypeScript strict mode.
+- Avoid `any`.
+- Use explicit types for API contracts.
+- Separate business logic from presentation.
+- Prefer composition over large conditional components.
+- Use reusable hooks where appropriate.
+- Follow SOLID principles where relevant.
+- Avoid unnecessary abstractions.
+- Keep dependencies minimal.
+- Keep code readable and maintainable.
+- Do not leave dead code.
+- Do not leave fake implementations in production paths.
+
+## 12. VIBE-CODING WORKFLOW
+
+Work incrementally.
+
+Do not generate the entire application in one pass.
+
+Before implementation:
+
+1. Inspect the existing repository.
+2. Identify existing configurations and dependencies.
+3. Inspect backend API contracts.
+4. Prepare a frontend implementation plan.
+5. Establish the design system.
+6. Establish the application layout.
+7. Implement features incrementally.
+
+For every feature:
+
+1. Understand the requirements.
+2. Identify backend APIs.
+3. Design the UI.
+4. Implement components.
+5. Integrate APIs.
+6. Handle loading, empty and error states.
+7. Verify responsiveness.
+8. Test interactions.
+9. Fix issues before moving to the next feature.
+
+Do not modify backend code unless explicitly requested.
+
+Do not change the technology stack.
+
+Do not generate mock data and accidentally present it as real backend data.
+
+Mock data may be used only in clearly isolated development/demo fixtures.
+
+## 13. DEFINITION OF DONE
+
+The application should:
+
+- Look like a premium developer SaaS product.
+- Be responsive on desktop, tablet and mobile.
+- Have consistent design tokens.
+- Have functional navigation.
+- Have functional forms and validation.
+- Integrate with actual backend APIs.
+- Have proper loading and error states.
+- Display delivery history correctly.
+- Support delivery inspection and replay where available.
+- Display real telemetry data where available.
+- Be accessible and keyboard navigable.
+- Build without TypeScript errors.
+- Pass essential tests.
+- Be deployable as a static frontend behind Nginx.
+
+## FINAL INSTRUCTION
+
+Treat this as a real commercial developer product.
+
+Visual quality, interaction quality, correctness and maintainability are equally important.
+
+Do not sacrifice architectural consistency for implementation speed.
+
+Do not add technologies or features without justification.
+
+When requirements are ambiguous, inspect the existing backend and repository first. Ask a focused clarification only when necessary.
+
+Build Event Relay as something a senior engineer would be proud to demonstrate in an SDE-3 interview.

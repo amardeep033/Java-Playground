@@ -1,0 +1,50 @@
+pgres cred:
+- spring.datasource.url=jdbc:postgresql://localhost:5432/postgres
+- spring.datasource.username=postgres
+- spring.datasource.password=postgres
+
+
+curl -i -X POST \
+  "http://localhost:8081/api/v1/applications/1b801c50-efcd-4b70-bfcc-5a3d5de0b68f/events" \
+  -H 'Content-Type: application/json' \
+  -H "X-API-Key: $API_KEY" \
+  -H "Idempotency-Key: test-$(date +%s)-$RANDOM" \
+  -d '{
+    "eventType": "test_event",
+    "payload": {
+      "orderId": "test-001",
+      "amount": 500
+    }
+  }'
+
+  
+User / Organization
+    └── Application
+          ├── API Keys
+          ├── Events
+          ├── Endpoints
+          │     ├── URL
+          │     ├── Signing Secret
+          │     └── Configuration
+          └── Receivers
+
+Already working:
+- Two Spring services with separate DB schemas.
+- Event ingestion → RabbitMQ → signed webhook delivery.
+- Outboxes, idempotency, deduplication, retries, DLQ and status updates.
+- Registration UI, applications, event types, endpoints, API keys, signing secrets and soft deletion.
+- Endpoint timeout, attempt limits and per-instance rate/concurrency limits.
+
+Main remaining work:
+- Redis caching, receiver-side rate limits and distributed delivery limits.
+- Circuit breakers and manual DLQ replay.
+- OpenTelemetry, Prometheus, Grafana, logs and latency metrics.
+- gRPC status reconciliation.
+- Login, cookies/JWT sessions and RBAC.
+- Receiver management and application-level settings.
+- App containers, Nginx, cloud deployment and enable/disable policy controls.
+
+The core delivery flow works. Most remaining effort is operational reliability, observability, security and completing the demo experience.
+
+123456789123
+er_CinVnDTBwkdfuJMsdq-gAnUNhftnVI4ybwWIHqL9qcI
