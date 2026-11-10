@@ -9,7 +9,7 @@ public final class MonitoringApi {
     private MonitoringApi() {}
     public record EventSummary(UUID id, String eventType, int deliveryCount, String status, Instant createdAt) {}
     public record DeliverySummary(UUID id, UUID eventId, UUID endpointId, String eventType, String endpointUrl,
-            String status, int attemptCount, Integer httpStatus, String error, Instant nextAttemptAt,
+            String status, int attemptCount, Integer httpStatus, String error,
             Instant createdAt, Instant updatedAt, UUID replayOfId, UUID replayId, boolean canReplay, String replayReason) {}
     public record Attempt(int attemptNumber, Integer httpStatus, String error, Instant startedAt, Instant completedAt,
             long durationMs, String responseBody, String contentType, boolean responseTruncated) {}

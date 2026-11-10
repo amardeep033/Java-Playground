@@ -41,7 +41,7 @@ public class Outbox {
             var rows = jdbc.query("""
                 WITH candidate AS (
                     SELECT id FROM service_b.outbox_messages
-                    WHERE published_at IS NULL AND deleted_at IS NULL AND available_at <= now()
+                    WHERE published_at IS NULL AND available_at <= now()
                       AND (locked_until IS NULL OR locked_until < now())
                     ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1
                 )

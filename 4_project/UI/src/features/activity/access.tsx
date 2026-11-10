@@ -1,15 +1,4 @@
-import { ShieldCheck } from "lucide-react";
-// Dashboard activity uses the HttpOnly session; external clients continue to use API keys.
+// Access is enforced by the authenticated layout and API; no repeated session banner.
 export function ActivityAccess({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <div className="activity-access-row">
-        <span>
-          <ShieldCheck size={15} />
-          Signed in with your workspace session
-        </span>
-      </div>
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

@@ -1,7 +1,9 @@
-import { Link, useSearchParams } from "react-router-dom";
+import {statusColumn} from "@/components/shared/column-filter";
+import { useTracking } from "./tracking-context";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Search, ArrowUpRight } from "lucide-react";
+import { Search } from "lucide-react";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
@@ -13,7 +15,8 @@ import { SendEventButton } from "./send-event";
 import { LiveRefresh, StatusBadge, Timestamp, useDebounced } from "./shared";
 import type { EventSummary } from "./types";
 function EventsContent() {
-  const { user, app } = useWorkspace();
+  const { app } = useWorkspace();
+  const {open}=useTracking();
   const [params, setParams] = useSearchParams();
   const q = params.get("q") || "";
   const status = params.get("status") || "";
@@ -33,22 +36,16 @@ function EventsContent() {
         { page, size: 20, status, q: search },
         signal,
       ),
+    placeholderData:previous=>previous,
     staleTime: 1000,
     refetchInterval: 3000,
   });
-  const root = `/users/${user.id}/apps/${app!.id}`;
   const columns: ColumnDef<EventSummary>[] = [
     {
       header: "Event",
       accessorKey: "id",
       cell: ({ row }) => (
-        <Link
-          className="resource-link"
-          to={`${root}/events/${row.original.id}`}
-        >
-          <code>{row.original.id.slice(0, 8)}…</code>
-          <ArrowUpRight size={13} />
-        </Link>
+        <code>{row.original.id.slice(0, 8)}…</code>
       ),
     },
     {
@@ -70,13 +67,6 @@ function EventsContent() {
   ];
   return (
     <>
-      <div className="activity-heading">
-        <div>
-          <p className="eyebrow">Event explorer</p>
-          <h2>Every event, in one place.</h2>
-        </div>
-        <SendEventButton />
-      </div>
       <ActivitySummary />
       <div className="activity-toolbar">
         <label className="search-field">
@@ -89,18 +79,6 @@ function EventsContent() {
             placeholder="Search by event ID or type…"
           />
         </label>
-        <select
-          className="input filter-select"
-          aria-label="Event status"
-          value={status}
-          onChange={(event) => filter("status", event.target.value)}
-        >
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="SUCCEEDED">Succeeded</option>
-          <option value="FAILED">Failed</option>
-          <option value="NO_SUBSCRIBERS">No subscribers</option>
-        </select>
         <LiveRefresh
           refreshing={query.isFetching}
           refresh={() => void query.refetch()}
@@ -114,6 +92,9 @@ function EventsContent() {
         <DataTable
           data={query.data}
           columns={columns}
+          columnFilters={{status:statusColumn(status,value=>filter("status",value),["PENDING","SUCCEEDED","FAILED","NO_SUBSCRIBERS"].map(value=>({value,label:value})))}}
+          onInspect={event=>open({kind:"event",id:event.id})}
+          inspectLabel="View event"
           page={page}
           onPage={(value) => filter("page", String(value))}
           emptyTitle={
@@ -136,7 +117,7 @@ export default function EventsPage() {
       <PageHeader
         eyebrow={app!.name}
         title="Events"
-        description="Publish events, inspect payloads, and follow every destination."
+        action={<SendEventButton />}
       />
       <ActivityAccess>
         <EventsContent />

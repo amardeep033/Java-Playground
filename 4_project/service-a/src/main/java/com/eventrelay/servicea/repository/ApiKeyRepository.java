@@ -7,7 +7,7 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import com.eventrelay.servicea.entity.ApiKey;
 
-public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
+public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<ApiKey> {
     Page<ApiKey> findByApplicationId(UUID applicationId, Pageable pageable);
     Optional<ApiKey> findByIdAndApplicationId(UUID id, UUID applicationId);
     Optional<ApiKey> findByKeyHashAndRevokedAtIsNull(String keyHash);

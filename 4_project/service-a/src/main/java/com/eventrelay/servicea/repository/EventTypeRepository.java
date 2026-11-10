@@ -3,7 +3,7 @@ import java.util.*;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import com.eventrelay.servicea.entity.EventType;
-public interface EventTypeRepository extends JpaRepository<EventType, UUID> {
+public interface EventTypeRepository extends JpaRepository<EventType, UUID>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<EventType> {
     Optional<EventType> findByApplicationIdAndName(UUID applicationId, String name);
     Page<EventType> findByApplicationId(UUID applicationId, Pageable pageable);
     Optional<EventType> findByIdAndApplicationId(UUID id, UUID applicationId);

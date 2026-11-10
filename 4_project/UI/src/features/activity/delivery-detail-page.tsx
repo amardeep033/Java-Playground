@@ -1,22 +1,19 @@
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowUpRight, Clock3, Globe2 } from "lucide-react";
+import { Clock3, Globe2 } from "lucide-react";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/shared/page-header";
 import {
   CopyButton,
   ErrorMessage,
   Loading,
 } from "@/components/shared/feedback";
-import { ActivityAccess } from "./access";
 import { activityApi } from "./api";
 import { JsonPanel, LiveRefresh, StatusBadge, Timestamp } from "./shared";
+import { TrackingNav, TrackingNext } from "./tracking-nav";
+import { TrackingRedirect } from "./tracking-redirect";
 import { ReplayButton } from "./replay-button";
-function DeliveryContent() {
-  const { deliveryId = "" } = useParams();
-  const { user, app } = useWorkspace();
-  const root = `/users/${user.id}/apps/${app!.id}`;
+export function DeliveryContent({deliveryId,deadLetter=false}:{deliveryId:string;deadLetter?:boolean}) {
+  const { app } = useWorkspace();
   const query = useQuery({
     queryKey: ["activity", app!.id, "delivery", deliveryId],
     queryFn: ({ signal }) => activityApi.delivery(app!.id, deliveryId, signal),
@@ -31,6 +28,12 @@ function DeliveryContent() {
   const { delivery, attempts, requestBody } = query.data;
   return (
     <>
+      <TrackingNav previous={{kind:"event",id:delivery.eventId}}>
+        {!deadLetter&&delivery.status==="DEAD"&&<TrackingNext view={{kind:"dead-letter",id:delivery.id}}>View in dead letters</TrackingNext>}
+        {delivery.replayId&&<TrackingNext view={{kind:"delivery",id:delivery.replayId}}>View replay</TrackingNext>}
+        {delivery.replayOfId&&<TrackingNext view={{kind:"delivery",id:delivery.replayOfId}}>View original in deliveries</TrackingNext>}
+      </TrackingNav>
+      {deadLetter&&delivery.status==="DEAD"&&<p className="dead-letter-notice">Final failed delivery. Replay creates a new delivery and preserves this history.</p>}
       <div className="delivery-heading">
         <div className="id-detail">
           <code>{delivery.id}</code>
@@ -42,21 +45,9 @@ function DeliveryContent() {
             refreshing={query.isFetching}
             refresh={() => void query.refetch()}
           />
-          {delivery.status === "DEAD" && <ReplayButton delivery={delivery} />}
+          {delivery.status === "DEAD" && !delivery.replayId && <ReplayButton delivery={delivery} />}
         </div>
       </div>
-      {delivery.replayOfId && (
-        <div className="replay-notice">
-          Replay of{" "}
-          <Link
-            className="text-link"
-            to={`${root}/deliveries/${delivery.replayOfId}`}
-          >
-            {delivery.replayOfId}
-            <ArrowUpRight size={12} />
-          </Link>
-        </div>
-      )}
       {delivery.status === "DEAD" &&
         !delivery.canReplay &&
         !delivery.replayId && (
@@ -71,13 +62,7 @@ function DeliveryContent() {
           <div>
             <dt>Event</dt>
             <dd>
-              <Link
-                className="text-link"
-                to={`${root}/events/${delivery.eventId}`}
-              >
-                <code>{delivery.eventType}</code>
-                <ArrowUpRight size={12} />
-              </Link>
+              <code>{delivery.eventType}</code>
             </dd>
           </div>
           <div>
@@ -96,11 +81,6 @@ function DeliveryContent() {
           </div>
         </dl>
         {delivery.error && <p className="delivery-error">{delivery.error}</p>}
-        {delivery.nextAttemptAt && (
-          <p className="field-hint">
-            Next retry: <Timestamp value={delivery.nextAttemptAt} />
-          </p>
-        )}
       </section>
       <JsonPanel title="Webhook request body" value={requestBody} />
       <section className="panel attempts-panel">
@@ -179,23 +159,5 @@ function DeliveryContent() {
   );
 }
 export default function DeliveryDetailPage() {
-  const { user, app } = useWorkspace();
-  return (
-    <>
-      <Button variant="ghost" size="sm" asChild>
-        <Link to={`/users/${user.id}/apps/${app!.id}/deliveries`}>
-          <ArrowLeft size={14} />
-          All deliveries
-        </Link>
-      </Button>
-      <PageHeader
-        eyebrow={app!.name}
-        title="Delivery details"
-        description="Inspect the request, attempt timeline, and response previews."
-      />
-      <ActivityAccess>
-        <DeliveryContent />
-      </ActivityAccess>
-    </>
-  );
+ const {deliveryId=""}=useParams();return <TrackingRedirect kind="delivery" id={deliveryId} section="deliveries"/>;
 }

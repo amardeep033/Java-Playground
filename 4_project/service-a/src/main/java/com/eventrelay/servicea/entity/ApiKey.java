@@ -40,4 +40,5 @@ public class ApiKey extends BaseEntity {
         revoke();
         replacedById = replacementId;
     }
+    public void updateName(String name) { this.name=name; }
 }

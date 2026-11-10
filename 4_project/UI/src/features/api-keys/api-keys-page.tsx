@@ -1,17 +1,14 @@
-import { useState } from "react";
+import {statusColumn} from "@/components/shared/column-filter";
+import { ListFilters } from "@/components/shared/list-filters";
+import { ResourceSettings } from "@/components/shared/resource-settings";
+import { useDebounced } from "@/features/activity/shared";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ColumnDef } from "@tanstack/react-table";
-import {
-  AlertTriangle,
-  KeyRound,
-  Plus,
-  RotateCw,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { AlertTriangle, KeyRound, Plus, RotateCw, Trash2, Pencil } from "lucide-react";
 import { keysApi } from "./api";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
 import { PageHeader } from "@/components/shared/page-header";
@@ -129,19 +126,25 @@ function KeyDetails({ id }: { id: string }) {
   );
 }
 export default function ApiKeysPage() {
-  const { app } = useWorkspace();
+  const { app, canAdmin } = useWorkspace();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const q = useDebounced(search);
+  const [status, setStatus] = useState("");
+
   const [create, setCreate] = useState(false);
   const [issued, setIssued] = useState<IssuedApiKey | null>(null);
+  const [editing, setEditing] = useState<ApiKey | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [action, setAction] = useState<{
     type: "rotate" | "revoke";
     key: ApiKey;
   } | null>(null);
   const query = useQuery({
-    queryKey: ["api-keys", app!.id, page],
-    queryFn: () => keysApi.list(app!.id, { page, size: 20 }),
+    placeholderData:previous=>previous,
+    queryKey: ["api-keys", app!.id, page, q, status],
+    queryFn: () => keysApi.list(app!.id, { page, size: 20, q, status }),
   });
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["api-keys", app!.id] });
@@ -165,79 +168,43 @@ export default function ApiKeysPage() {
       refresh();
     },
   });
-  const columns: ColumnDef<ApiKey>[] = [
-    {
-      header: "Name",
-      accessorKey: "name",
-      cell: ({ row }) => (
-        <button
-          className="resource-link"
-          onClick={() => setSelected(row.original.id)}
-        >
-          <span className="table-icon">
-            <KeyRound size={16} />
-          </span>
-          <strong>{row.original.name}</strong>
-        </button>
-      ),
-    },
-    {
-      header: "Key prefix",
-      accessorKey: "prefix",
-      cell: ({ getValue }) => (
-        <code className="muted">{getValue<string>()}••••••</code>
-      ),
-    },
-    {
-      header: "Status",
-      accessorKey: "revokedAt",
-      cell: ({ row }) => (
-        <span
-          className={`badge ${row.original.revokedAt ? "" : "badge-success"}`}
-        >
-          <span className="badge-dot" />
-          {row.original.revokedAt ? "Revoked" : "Active"}
-        </span>
-      ),
-    },
-    {
-      header: "Created",
-      accessorKey: "createdAt",
-      cell: ({ getValue }) => date(getValue<string>()),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={!!row.original.revokedAt}
-            onClick={() => {
-              mutation.reset();
-              setAction({ type: "rotate", key: row.original });
-            }}
+  const columns = useMemo<ColumnDef<ApiKey>[]>(
+    () => [
+      {
+        header: "Name",
+        accessorKey: "name",
+        cell: ({ row }) => (
+          <button
+            className="resource-link"
+            onClick={() => setSelected(row.original.id)}
           >
-            <RotateCw size={13} />
-            Rotate
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={!!row.original.revokedAt}
-            onClick={() => {
-              mutation.reset();
-              setAction({ type: "revoke", key: row.original });
-            }}
-          >
-            <Trash2 size={13} />
-            Revoke
-          </Button>
-        </div>
-      ),
-    },
-  ];
+            <span className="table-icon">
+              <KeyRound size={16} />
+            </span>
+            <strong>{row.original.name}</strong>
+          </button>
+        ),
+      },
+      {
+        header: "Key prefix",
+        accessorKey: "prefix",
+        cell: ({ getValue }) => (
+          <code className="muted">{getValue<string>()}••••••</code>
+        ),
+      },
+      {
+        header: "Created",
+        accessorKey: "createdAt",
+        cell: ({ getValue }) => date(getValue<string>()),
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => <Button variant="ghost" size="icon" aria-label="Edit" title={`Edit ${row.original.name}`} onClick={()=>setEditing(row.original)}><Pencil size={16} /></Button>,
+      },
+    ],
+    [],
+  );
   return (
     <>
       <PageHeader
@@ -251,13 +218,23 @@ export default function ApiKeysPage() {
           </Button>
         }
       />
-      <div className="subtle-note">
-        <ShieldCheck size={17} />
-        <span>
-          Key secrets are shown once. Store them somewhere safe before closing
-          the dialog.
-        </span>
-      </div>
+      <ListFilters hideStatus
+        label="API keys"
+        search={search}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(0);
+        }}
+        status={status}
+        onStatus={(value) => {
+          setStatus(value);
+          setPage(0);
+        }}
+        options={[
+          { value: "ACTIVE", label: "Active" },
+          { value: "REVOKED", label: "Revoked" },
+        ]}
+      />
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (
@@ -266,12 +243,26 @@ export default function ApiKeysPage() {
         <DataTable
           data={query.data}
           columns={columns}
+          columnFilters={{status:statusColumn(status,value=>{setStatus(value);setPage(0);},[{value:"ACTIVE",label:"Active"},{value:"REVOKED",label:"Revoked"}])}}
           page={page}
           onPage={setPage}
-          emptyTitle="Create your first API key"
+          emptyTitle={
+            q || status ? "No matching api keys" : "Create your first API key"
+          }
           emptyDescription="Generate an application credential, then save the secret in your secret manager."
         />
       )}
+
+      {/* Editor lifetime is independent of delayed search results and table refreshes. */}
+      {editing && <ResourceSettings showTrigger={false} open onOpenChange={open=>{if(!open)setEditing(null);}} name={editing.name}
+        metadata={{title:"Edit API key",name:editing.name,editName:true,
+          save:body=>keysApi.update(app!.id,editing.id,{name:body.name!}),onSaved:refresh}}>
+        {close=><>
+          <div className="editor-activation"><span>{editing.revokedAt?"Revoked":"Active"}</span><button type="button" role="switch" className="activation-switch" aria-label="API key active" aria-checked={!editing.revokedAt} disabled={!canAdmin||!!editing.revokedAt} title={editing.revokedAt?"Revoked keys cannot be reactivated":"Revoke key (requires confirmation)"} onClick={()=>{close();mutation.reset();setAction({type:"revoke",key:editing});}}><span/></button></div>
+          <Button variant="outline" disabled={!!editing.revokedAt} onClick={()=>{close();mutation.reset();setAction({type:"rotate",key:editing});}}><RotateCw size={14} />Rotate</Button>
+          {canAdmin && <div className="danger-zone"><h3>Revoke API key</h3><p>Rejects future requests using this key. Accepted deliveries continue.</p><Button variant="ghost" className="danger-link" disabled={!!editing.revokedAt} onClick={()=>{close();mutation.reset();setAction({type:"revoke",key:editing});}}><Trash2 size={14} />Revoke</Button></div>}
+        </>}
+      </ResourceSettings>}
       <Dialog
         open={create || !!issued || !!action || !!selected}
         onOpenChange={(open) => {

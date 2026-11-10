@@ -17,6 +17,7 @@ export interface AcceptedEvent {
   createdAt: string;
 }
 export interface EventDetails {
+  incomingRequestId: string;
   id: string;
   applicationId: string;
   eventType: string;
@@ -34,7 +35,6 @@ export interface Delivery {
   attemptCount: number;
   httpStatus: number | null;
   error: string | null;
-  nextAttemptAt: string | null;
   createdAt: string;
   updatedAt: string;
   replayOfId: string | null;

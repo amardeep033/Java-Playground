@@ -1,7 +1,6 @@
-import { Link } from "react-router-dom";
+import {statusColumn} from "@/components/shared/column-filter";
+import { useTracking } from "./tracking-context";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpRight } from "lucide-react";
-import { useWorkspace } from "@/app/layouts/workspace-layout";
 import { DataTable } from "@/components/shared/data-table";
 import type { Page } from "@/types/api";
 import type { Delivery } from "./types";
@@ -12,27 +11,22 @@ export function DeliveriesTable({
   page,
   onPage,
   failed = false,
+  status="",onStatus,
 }: {
   data: Page<Delivery>;
   page: number;
   onPage: (page: number) => void;
   failed?: boolean;
+  status?:string;onStatus?:(value:string)=>void;
 }) {
-  const { user, app } = useWorkspace();
-  const root = `/users/${user.id}/apps/${app!.id}`;
+  const {open}=useTracking();
   const columns: ColumnDef<Delivery>[] = [
     {
       header: "Delivery",
       accessorKey: "id",
       cell: ({ row }) => (
         <div>
-          <Link
-            className="resource-link"
-            to={`${root}/deliveries/${row.original.id}`}
-          >
-            <code>{row.original.id.slice(0, 8)}…</code>
-            <ArrowUpRight size={12} />
-          </Link>
+          <code>{row.original.id.slice(0, 8)}…</code>
           {row.original.replayOfId && (
             <span className="replay-label">Replay</span>
           )}
@@ -72,12 +66,6 @@ export function DeliveriesTable({
       id: "actions",
       cell: ({ row }) => (
         <div className="flex gap-2">
-          <Link
-            className="button button-ghost button-sm"
-            to={`${root}/deliveries/${row.original.id}`}
-          >
-            Inspect
-          </Link>
           {row.original.status === "DEAD" && (
             <ReplayButton delivery={row.original} />
           )}
@@ -89,6 +77,9 @@ export function DeliveriesTable({
     <DataTable
       data={data}
       columns={columns}
+      columnFilters={onStatus&&!failed?{status:statusColumn(status,onStatus,[{value:"PENDING",label:"Pending"},{value:"SUCCEEDED",label:"Succeeded"},{value:"DEAD",label:"Failed"}])}:undefined}
+      onInspect={delivery=>open({kind:failed?"dead-letter":"delivery",id:delivery.id})}
+      inspectLabel={failed?"View dead letter":"View delivery"}
       page={page}
       onPage={onPage}
       emptyTitle={failed ? "No failed deliveries" : "No matching deliveries"}

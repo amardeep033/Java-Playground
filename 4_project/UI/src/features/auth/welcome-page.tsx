@@ -56,6 +56,9 @@ function RegistrationForm() {
           aria-invalid={!!errors.name}
         />
       </Field>
+      <Field label="Company name" id="company-name" error={errors.companyName?.message}>
+        <Input id="company-name" autoComplete="organization" placeholder="Acme" {...register("companyName")} />
+      </Field>
       <Field label="Email address" id="email" error={errors.email?.message}>
         <Input
           id="email"
@@ -95,7 +98,7 @@ const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password.").max(128),
 });
-function LoginForm() {
+export function LoginForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const {
@@ -108,10 +111,15 @@ function LoginForm() {
   });
   const mutation = useMutation({
     mutationFn: authApi.login,
-    onSuccess: (session) => {
+    onSuccess: async (session) => {
       reset();
+      await queryClient.cancelQueries();
+      queryClient.clear();
       queryClient.setQueryData(["session"], session);
-      navigate(`/users/${session.user.id}/applications`, { replace: true });
+      navigate(
+        `/users/${session.user.id}/applications`,
+        { replace: true },
+      );
     },
   });
   return (
@@ -161,7 +169,12 @@ export default function WelcomePage() {
   });
   if (session.data && !session.isError)
     return (
-      <Navigate to={`/users/${session.data.user.id}/applications`} replace />
+      <Navigate
+        to={
+          `/users/${session.data.user.id}/applications`
+        }
+        replace
+      />
     );
   return (
     <div className="welcome">
@@ -262,9 +275,10 @@ export default function WelcomePage() {
           </div>
           {tab === "register" ? <RegistrationForm /> : <LoginForm />}
           <p className="welcome-note">
-            Your session stays signed in after a refresh. Sign out on shared
+            An HttpOnly cookie keeps you signed in after refresh until it expires. Sign out on shared
             devices.
           </p>
+
         </div>
         <footer className="welcome-bottom">
           Event Relay{" "}

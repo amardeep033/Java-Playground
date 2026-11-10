@@ -19,7 +19,7 @@ public class StatusListener {
         long tag = message.getMessageProperties().getDeliveryTag();
         DeliveryStatusMessage update;
         try {
-            if (message.getBody().length > 65536) throw new IllegalArgumentException("Status message is too large");
+            if (message.getBody().length > 524288) throw new IllegalArgumentException("Status message is too large");
             update = mapper.readValue(message.getBody(), DeliveryStatusMessage.class); if (update == null) throw new IllegalArgumentException("Empty message"); update.validate();
         } catch (JsonProcessingException | IllegalArgumentException ex) { channel.basicReject(tag, false); return; }
         try { service.apply(update); channel.basicAck(tag, false); }

@@ -10,8 +10,15 @@ export const applicationsApi = {
   get: async (userId: string, appId: string) =>
     (await client.get<Application>(`/users/${userId}/applications/${appId}`))
       .data,
-  create: async (userId: string, body: { name: string }) =>
+  create: async (userId: string, body: { name: string; clientId?: string }) =>
     (await client.post<Application>(`/users/${userId}/applications`, body))
+      .data,
+  update: async (
+    userId: string,
+    id: string,
+    body: { name?: string; description?: string | null; active?: boolean },
+  ) =>
+    (await client.put<Application>(`/users/${userId}/applications/${id}`, body))
       .data,
   remove: async (userId: string, appId: string) => {
     await client.delete(`/users/${userId}/applications/${appId}`);

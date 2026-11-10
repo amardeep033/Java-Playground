@@ -1,13 +1,17 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import {SubscriptionSelect} from "./subscription-select";
+import {statusColumn} from "@/components/shared/column-filter";
+import { ActivationToggle } from "@/components/shared/activation-toggle";
+import { ListFilters } from "@/components/shared/list-filters";
+import { ResourceSettings } from "@/components/shared/resource-settings";
+import { useDebounced } from "@/features/activity/shared";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Globe2, Plus, KeyRound } from "lucide-react";
+import { Globe2, Plus, KeyRound, Pencil } from "lucide-react";
 import { endpointsApi } from "./api";
 import { endpointSchema, type EndpointValues } from "./schemas";
-import { eventTypesApi } from "@/features/events/api";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
@@ -19,8 +23,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DeleteResource } from "@/components/shared/delete-resource";
+import { RoutingEditor } from "./routing-editor";
 import { ConfigurationForm } from "./configuration-form";
 import type { Endpoint, IssuedEndpoint } from "@/types/api";
 import { date } from "@/lib/utils";
@@ -32,13 +36,8 @@ function CreateEndpoint({
   onClose: () => void;
   onIssued: (issued: IssuedEndpoint) => void;
 }) {
-  const { app, user } = useWorkspace();
+  const { app } = useWorkspace();
   const queryClient = useQueryClient();
-  const [eventPage, setEventPage] = useState(0);
-  const events = useQuery({
-    queryKey: ["event-types", app!.id, "selection", eventPage],
-    queryFn: () => eventTypesApi.list(app!.id, { page: eventPage, size: 8 }),
-  });
   const {
     register,
     handleSubmit,
@@ -65,6 +64,17 @@ function CreateEndpoint({
       onSubmit={handleSubmit((value) => mutation.mutate(value))}
     >
       <Field
+        id="endpoint-name"
+        label="Endpoint name"
+        error={errors.name?.message}
+      >
+        <Input
+          id="endpoint-name"
+          placeholder="Order processing webhook"
+          {...register("name")}
+        />
+      </Field>
+      <Field
         id="endpoint-url"
         label="Destination URL"
         error={errors.url?.message}
@@ -88,91 +98,15 @@ function CreateEndpoint({
           {...register("description")}
         />
       </Field>
-      <fieldset className="subscription-fieldset">
-        <legend>
-          Subscribe to event types{" "}
-          <span className="count-badge">{selected.length} selected</span>
-        </legend>
-        {events.isPending ? (
-          <Loading />
-        ) : events.isError ? (
-          <ErrorMessage
-            error={events.error}
-            retry={() => void events.refetch()}
-          />
-        ) : events.data.totalElements === 0 ? (
-          <p className="field-hint">
-            Create an event type first.{" "}
-            <Link
-              className="text-link"
-              to={`/users/${user.id}/apps/${app!.id}/event-types`}
-            >
-              Go to event types
-            </Link>
-          </p>
-        ) : (
-          <>
-            <div className="subscription-list">
-              {events.data.items.map((event) => (
-                <label className="subscription-option" key={event.id}>
-                  <Checkbox
-                    checked={selected.includes(event.id)}
-                    onCheckedChange={(checked) =>
-                      setValue(
-                        "eventTypeIds",
-                        checked === true
-                          ? [...selected, event.id]
-                          : selected.filter((id) => id !== event.id),
-                        { shouldValidate: true },
-                      )
-                    }
-                  />
-                  <span>
-                    <code>{event.name}</code>
-                    {event.description && <small>{event.description}</small>}
-                  </span>
-                </label>
-              ))}
-            </div>
-            {events.data.totalPages > 1 && (
-              <div className="pagination">
-                <span>
-                  Page {eventPage + 1} of {events.data.totalPages}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={eventPage === 0}
-                  onClick={() => setEventPage(eventPage - 1)}
-                >
-                  Previous types
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={eventPage + 1 >= events.data.totalPages}
-                  onClick={() => setEventPage(eventPage + 1)}
-                >
-                  Next types
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-        {errors.eventTypeIds && (
-          <p role="alert" className="field-error">
-            {errors.eventTypeIds.message}
-          </p>
-        )}
-      </fieldset>
+      <Field id="create-subscriptions" label="Event subscriptions" error={errors.eventTypeIds?.message}>
+        <SubscriptionSelect id="create-subscriptions" appId={app!.id} selected={selected} onChange={ids=>setValue("eventTypeIds",ids,{shouldValidate:true})}/>
+      </Field>
       <ErrorMessage error={mutation.error} />
       <div className="dialog-actions">
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button disabled={mutation.isPending || !events.data?.totalElements}>
+        <Button disabled={mutation.isPending || !selected.length}>
           Create endpoint
         </Button>
       </div>
@@ -193,6 +127,8 @@ function EndpointDetails({ id }: { id: string }) {
     <dl className="detail-list">
       <dt>Destination URL</dt>
       <dd className="break-anywhere">{query.data.url}</dd>
+      <dt>Name</dt>
+      <dd>{query.data.name}</dd>
       <dt>Description</dt>
       <dd>{query.data.description || "No description provided."}</dd>
       <dt>Endpoint ID</dt>
@@ -211,7 +147,7 @@ function EndpointDetails({ id }: { id: string }) {
       </dd>
       <dt>Configuration</dt>
       <dd>
-        {query.data.configuration.enabled ? "Enabled" : "Disabled"} ·{" "}
+        {query.data.active ? "Active" : "Inactive"} ·{" "}
         {query.data.configuration.rateLimitPerSecond} requests/s ·{" "}
         {query.data.configuration.concurrencyLimit} concurrent ·{" "}
         {query.data.configuration.timeoutMs} ms timeout ·{" "}
@@ -220,7 +156,7 @@ function EndpointDetails({ id }: { id: string }) {
       <dt>Signing secret</dt>
       <dd>
         {query.data.signingSecretVersion > 0
-          ? `Version ${query.data.signingSecretVersion} · secret hidden`
+          ? `Rotation ${query.data.signingSecretVersion} · secret hidden`
           : "Not configured — generate a secret using Rotate secret."}
       </dd>
       <dt>Created</dt>
@@ -230,11 +166,15 @@ function EndpointDetails({ id }: { id: string }) {
 }
 export default function EndpointsPage() {
   const queryClient = useQueryClient();
-  const { app } = useWorkspace();
+  const { app, canAdmin } = useWorkspace();
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const q = useDebounced(search);
+  const [status, setStatus] = useState("");
+
   const [create, setCreate] = useState(false);
   const [issued, setIssued] = useState<IssuedEndpoint | null>(null);
-  const [configure, setConfigure] = useState<Endpoint | null>(null);
+  const [editing, setEditing] = useState<Endpoint | null>(null);
   const [rotate, setRotate] = useState<Endpoint | null>(null);
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["endpoints", app!.id] });
@@ -250,85 +190,54 @@ export default function EndpointsPage() {
   });
   const [selected, setSelected] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ["endpoints", app!.id, page],
-    queryFn: () => endpointsApi.list(app!.id, { page, size: 20 }),
+    placeholderData:previous=>previous,
+    queryKey: ["endpoints", app!.id, page, q, status],
+    queryFn: () => endpointsApi.list(app!.id, { page, size: 20, q, status }),
   });
-  const columns: ColumnDef<Endpoint>[] = [
-    {
-      header: "Destination",
-      accessorKey: "url",
-      cell: ({ row }) => (
-        <button
-          className="resource-link"
-          onClick={() => setSelected(row.original.id)}
-        >
-          <span className="table-icon">
-            <Globe2 size={16} />
-          </span>
-          <span className="endpoint-cell">
-            <strong>{row.original.url}</strong>
-            <small>{row.original.description || "Webhook endpoint"}</small>
-          </span>
-        </button>
-      ),
-    },
-    {
-      header: "Subscriptions",
-      accessorKey: "eventTypeIds",
-      cell: ({ row }) => (
-        <span className="badge">
-          {row.original.eventTypeIds.length} event{" "}
-          {row.original.eventTypeIds.length === 1 ? "type" : "types"}
-        </span>
-      ),
-    },
-    {
-      header: "Created",
-      accessorKey: "createdAt",
-      cell: ({ getValue }) => date(getValue<string>()),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex gap-1 flex-wrap">
-          <Button
-            variant="ghost"
-            size="sm"
+  const columns = useMemo<ColumnDef<Endpoint>[]>(
+    () => [
+      {
+        header: "Destination",
+        accessorKey: "url",
+        cell: ({ row }) => (
+          <button
+            className="resource-link"
             onClick={() => setSelected(row.original.id)}
           >
-            View details
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setConfigure(row.original)}
-          >
-            Configure
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              rotation.reset();
-              setRotate(row.original);
-            }}
-          >
-            Rotate secret
-          </Button>
-          <DeleteResource
-            name="endpoint"
-            description="This destination will be removed from active use. Its configuration and subscription history are retained."
-            remove={() => endpointsApi.remove(app!.id, row.original.id)}
-            onDeleted={() => {
-              setPage(0);
-              refresh();
-            }}
-          />
-        </div>
-      ),
-    },
-  ];
+            <span className="table-icon">
+              <Globe2 size={16} />
+            </span>
+            <span className="endpoint-cell">
+              <strong>{row.original.name}</strong>
+              <small>{row.original.url}</small>
+              {row.original.description && <small>{row.original.description}</small>}
+            </span>
+          </button>
+        ),
+      },
+      {
+        header: "Subscriptions",
+        accessorKey: "eventTypeIds",
+        cell: ({ row }) => (
+          <span className="badge">
+            {row.original.eventTypeIds.length} event{" "}
+            {row.original.eventTypeIds.length === 1 ? "type" : "types"}
+          </span>
+        ),
+      },
+      {
+        header: "Created",
+        accessorKey: "createdAt",
+        cell: ({ getValue }) => date(getValue<string>()),
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => <Button variant="ghost" size="icon" aria-label="Edit" title={`Edit ${row.original.name}`} onClick={()=>setEditing(row.original)}><Pencil size={16} /></Button>,
+      },
+    ],
+    [],
+  );
   return (
     <>
       <PageHeader
@@ -342,13 +251,23 @@ export default function EndpointsPage() {
           </Button>
         }
       />
-      <div className="subtle-note">
-        <Globe2 size={17} />
-        <span>
-          Each endpoint subscribes to one or more event types in this
-          application.
-        </span>
-      </div>
+      <ListFilters hideStatus
+        label="endpoints"
+        search={search}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(0);
+        }}
+        status={status}
+        onStatus={(value) => {
+          setStatus(value);
+          setPage(0);
+        }}
+        options={[
+          { value: "ACTIVE", label: "Active" },
+          { value: "INACTIVE", label: "Inactive" },
+        ]}
+      />
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (
@@ -357,21 +276,39 @@ export default function EndpointsPage() {
         <DataTable
           data={query.data}
           columns={columns}
+          columnFilters={{status:statusColumn(status,value=>{setStatus(value);setPage(0);},undefined)}}
           page={page}
           onPage={setPage}
-          emptyTitle="Add your first destination"
+          emptyTitle={
+            q || status ? "No matching endpoints" : "Add your first destination"
+          }
           emptyDescription="Connect an HTTP endpoint and choose which event types it subscribes to."
         />
       )}
+
+      {/* Keep the editor outside table rows so background refreshes preserve drafts. */}
+      {editing && <ResourceSettings showTrigger={false} open onOpenChange={open=>{if(!open)setEditing(null);}} name={editing.name}
+        metadata={{title:"Edit endpoint",name:editing.name,description:editing.description,editName:true,editDescription:true,
+          save:body=>endpointsApi.update(app!.id,editing.id,body),onSaved:refresh}}>
+        {close=><>
+          <ActivationToggle canChange={canAdmin} active={(query.data?.items.find(endpoint=>endpoint.id===editing.id) ?? editing).active} name={editing.url} save={async active=>{await endpointsApi.setActive(app!.id,editing.id,active);setEditing(current=>current ? {...current,active} : null);}} />
+          <section className="editor-section"><h3>Delivery configuration</h3><ConfigurationForm endpoint={editing} onSaved={()=>{setEditing(null);refresh();}}/></section>
+          {canAdmin&&<section className="editor-section"><h3>Destination & subscriptions</h3><RoutingEditor endpoint={editing} onSaved={()=>{setEditing(null);refresh();}}/></section>}
+          <div className="settings-action-grid">
+            <Button variant="outline" onClick={()=>{close();rotation.reset();setRotate(editing);}}>Rotate secret</Button>
+          </div>
+          {canAdmin && <div className="danger-zone"><h3>Delete endpoint</h3><p>Stops new deliveries to this destination. History is retained.</p><DeleteResource name="endpoint" description="This destination will be removed from active use. History is retained; this cannot be undone in the UI." remove={()=>endpointsApi.remove(app!.id,editing.id)} onDeleted={()=>{close();setPage(0);refresh();}} /></div>}
+        </>}
+      </ResourceSettings>}
       <Dialog
-        open={create || !!selected || !!issued || !!configure || !!rotate}
+        open={create || !!selected || !!issued || !!rotate}
         onOpenChange={(open) => {
           if (!open && !rotation.isPending) {
             setCreate(false);
             setSelected(null);
             setIssued(null);
-            setConfigure(null);
             setRotate(null);
+
           }
         }}
       >
@@ -388,7 +325,7 @@ export default function EndpointsPage() {
                 <CopyButton value={issued.signingSecret} label="Copy secret" />
               </div>
               <p className="field-hint">
-                Signing secret version {issued.endpoint.signingSecretVersion}.
+                Signing secret rotation {issued.endpoint.signingSecretVersion}.
                 Rotation immediately replaces the previous secret for future
                 signing.
               </p>
@@ -397,20 +334,6 @@ export default function EndpointsPage() {
                   I’ve saved the secret
                 </Button>
               </div>
-            </>
-          ) : configure ? (
-            <>
-              <DialogHeader
-                title="Endpoint configuration"
-                description="Control future delivery behavior for this endpoint."
-              />
-              <ConfigurationForm
-                endpoint={configure}
-                onSaved={() => {
-                  setConfigure(null);
-                  refresh();
-                }}
-              />
             </>
           ) : rotate ? (
             <>

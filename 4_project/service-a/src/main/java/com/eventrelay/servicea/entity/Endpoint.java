@@ -9,13 +9,20 @@ public class Endpoint extends BaseEntity {
     @Column(name = "application_id", nullable = false)
     private UUID applicationId;
 
+    @Column(name="name",nullable=false,length=120)
+    private String name="Endpoint";
+    public String getName() { return name; }
+    public void updateName(String name) { this.name=name; }
+
     @Column(name = "url", nullable = false, length = 2048)
     private String url;
+    public void updateUrl(String url) { this.url=url; }
+    public void updateSubscriptions(Set<EventType> types) { this.eventTypes=new HashSet<>(types); }
 
     @Column(name = "description", nullable = true, length = 500)
     private String description;
 
-    @Column(nullable = false)
+    @Column(name="is_active", nullable = false)
     private boolean enabled = true;
     @Column(name = "rate_limit_per_second", nullable = false)
     private int rateLimitPerSecond = 10;
@@ -50,6 +57,7 @@ public class Endpoint extends BaseEntity {
     public String getDescription() { return description; }
     public Set<EventType> getEventTypes() { return Collections.unmodifiableSet(eventTypes); }
 
+    public void setActive(boolean active) { this.enabled=active; }
     public boolean isEnabled() { return enabled; }
     public int getRateLimitPerSecond() { return rateLimitPerSecond; }
     public int getConcurrencyLimit() { return concurrencyLimit; }
@@ -70,4 +78,5 @@ public class Endpoint extends BaseEntity {
         signingSecretVersion++;
         signingSecretRotatedAt = java.time.Instant.now();
     }
+    public void updateDescription(String description) { this.description=description; }
 }

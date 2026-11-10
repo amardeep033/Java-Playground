@@ -30,7 +30,7 @@ public class RabbitMqConfig {
                 BindingBuilder.bind(main).to(delivery).with("delivery.requested"),
                 BindingBuilder.bind(delayed).to(retry).with("delivery.retry"),
                 BindingBuilder.bind(dlq).to(dead).with("delivery.dead"),
-                BindingBuilder.bind(updates).to(status).with("delivery.updated"),
+                BindingBuilder.bind(updates).to(status).with("delivery.completed"),
                 BindingBuilder.bind(statusDlq).to(dead).with("status.dead"));
     }
     @Bean ThreadPoolTaskScheduler taskScheduler() {

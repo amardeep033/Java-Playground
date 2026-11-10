@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, selectColumn } from "./fixtures";
 import type { Application, IssuedApiKey, User } from "../src/types/api";
 import type { DeliveryDetails } from "../src/features/activity/types";
 
@@ -60,6 +60,19 @@ test("send, monitor attempts, replay a failed delivery and browse history", asyn
   await expect(
     page.getByRole("heading", { name: "Your first event starts here" }),
   ).toBeVisible();
+  await expect(page.getByText("Event explorer", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByText("Signed in with your workspace session", { exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (await page.locator(".activity-toolbar").boundingBox())!.y,
+  ).toBeLessThan(320);
+  await page.screenshot({
+    path: testInfo.outputPath("events-compact-desktop.png"),
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Send event", exact: true }).click();
   await page.getByLabel("Event type", { exact: true }).selectOption("ui.test");
   await page.getByLabel("JSON payload", { exact: true }).fill("{invalid");
@@ -70,14 +83,12 @@ test("send, monitor attempts, replay a failed delivery and browse history", asyn
   await expect(
     page.getByText("Enter valid JSON.", { exact: true }),
   ).toBeVisible();
-  await page
-    .getByLabel("JSON payload", { exact: true })
-    .fill(
-      JSON.stringify({
-        orderId: "ui-order-001",
-        message: "<script>not executable</script>",
-      }),
-    );
+  await page.getByLabel("JSON payload", { exact: true }).fill(
+    JSON.stringify({
+      orderId: "ui-order-001",
+      message: "<script>not executable</script>",
+    }),
+  );
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Send event", exact: true })
@@ -85,23 +96,22 @@ test("send, monitor attempts, replay a failed delivery and browse history", asyn
   await expect(
     page.getByRole("heading", { name: "Event details", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("cell", { name: "Failed", exact: true }),
-  ).toBeVisible({ timeout: 20_000 });
-  await expect(
-    page.getByText("<script>not executable</script>", { exact: false }),
-  ).toBeVisible();
-  const eventId = page.url().split("/").pop()!;
-  await page.getByRole("link", { name: "Inspect", exact: true }).click();
+  await expect(page.getByRole("dialog").getByText("<script>not executable</script>", { exact: false })).toBeVisible();
+  const eventId = new URL(page.url()).searchParams.get("inspectId")!;
+  await page.getByRole("dialog").getByText("Related records",{exact:true}).click();
+  await page.getByRole("dialog").getByRole("button",{name:"View in deliveries",exact:true}).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: "Failed", exact: true })).toBeVisible({timeout:20_000});
+  await page.getByRole("button",{name:"View delivery",exact:true}).first().click();
   await expect(
     page.getByRole("heading", { name: "Delivery details", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Attempt 1", { exact: true })).toBeVisible();
-  await expect(page.getByText("Attempt 2", { exact: true })).toBeVisible();
+  await expect(page.locator(".tracking-dialog").getByText("Attempt 1", { exact: true })).toBeVisible();
+  await expect(page.locator(".tracking-dialog").getByText("Attempt 2", { exact: true })).toBeVisible();
   await expect(page.locator("details[open] pre")).toContainText(
     "temporary failure",
   );
-  const originalId = page.url().split("/").pop()!;
+  const originalId = new URL(page.url()).searchParams.get("inspectId")!;
   await page.screenshot({
     path: testInfo.outputPath("failed-delivery.png"),
     fullPage: true,
@@ -113,13 +123,15 @@ test("send, monitor attempts, replay a failed delivery and browse history", asyn
   await page
     .getByRole("button", { name: "Confirm replay", exact: true })
     .click();
-  await expect(page).not.toHaveURL(new RegExp(`${originalId}$`));
-  const replayId = page.url().split("/").pop()!;
-  await expect(page.getByText("Succeeded", { exact: true })).toBeVisible({
-    timeout: 20_000,
-  });
-  await expect(page.getByText("Replay of", { exact: false })).toBeVisible();
-  await expect(page.getByText("accepted", { exact: false })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const replayId = new URL(page.url()).searchParams.get("q")!;
+  expect(replayId).not.toBe(originalId);
+  await page.locator("tr.selected-row").getByRole("button",{name:"View delivery",exact:true}).click();
+  await expect(page.locator(".tracking-dialog").getByText("Succeeded", { exact: true })).toBeVisible({timeout:20_000});
+  await page.locator(".tracking-dialog").getByText("Related records",{exact:true}).click();
+  await expect(page.locator(".tracking-dialog").getByRole("button",{name:"View original in deliveries",exact:true})).toBeVisible();
+  await page.locator(".tracking-dialog").getByText("Related records",{exact:true}).click();
+  await expect(page.locator(".tracking-dialog").getByText("accepted", { exact: false })).toBeVisible();
   const original = (await (
     await request.get(
       `${api}/applications/${app.id}/deliveries/${originalId}`,
@@ -129,6 +141,7 @@ test("send, monitor attempts, replay a failed delivery and browse history", asyn
   expect(original.delivery.status).toBe("DEAD");
   expect(original.delivery.replayId).toBe(replayId);
   expect(original.attempts).toHaveLength(2);
+  await page.getByRole("button",{name:"Close dialog",exact:true}).click();
   await page
     .getByRole("navigation")
     .getByRole("link", { name: "Dead letters", exact: true })
@@ -140,15 +153,13 @@ test("send, monitor attempts, replay a failed delivery and browse history", asyn
     .getByRole("checkbox", { name: "Include replayed", exact: true })
     .check();
   await expect(
-    page.getByRole("link", { name: "View replay", exact: true }),
+    page.getByRole("button", { name: "View replay", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("navigation")
     .getByRole("link", { name: "Events", exact: true })
     .click();
-  await page
-    .getByLabel("Event status", { exact: true })
-    .selectOption("SUCCEEDED");
+  await selectColumn(page,"Status",["SUCCEEDED"]);
   await expect(
     page.getByRole("cell", { name: "Succeeded", exact: true }),
   ).toBeVisible();

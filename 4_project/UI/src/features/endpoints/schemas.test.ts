@@ -8,11 +8,15 @@ describe("endpoint validation", () => {
     "https://user:pass@example.com/hook",
     "https://example.com/hook#fragment",
   ])("rejects unsupported URL %s", (url) => {
-    expect(endpointSchema.safeParse({ url, eventTypeIds }).success).toBe(false);
+    expect(
+      endpointSchema.safeParse({ name: "Test endpoint", url, eventTypeIds })
+        .success,
+    ).toBe(false);
   });
   it("requires an event subscription", () => {
     expect(
       endpointSchema.safeParse({
+        name: "Test endpoint",
         url: "https://example.com/hook",
         eventTypeIds: [],
       }).success,
@@ -21,6 +25,7 @@ describe("endpoint validation", () => {
   it("accepts HTTPS with valid event types", () => {
     expect(
       endpointSchema.safeParse({
+        name: "Test endpoint",
         url: "https://example.com/hook",
         eventTypeIds,
       }).success,

@@ -4,12 +4,10 @@ import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ErrorMessage } from "@/components/shared/feedback";
 import type { Endpoint } from "@/types/api";
 import { endpointsApi } from "./api";
 const schema = z.object({
-  enabled: z.boolean(),
   rateLimitPerSecond: z.number().int().min(1).max(100000),
   concurrencyLimit: z.number().int().min(1).max(1000),
   timeoutMs: z.number().int().min(100).max(60000),
@@ -26,8 +24,6 @@ export function ConfigurationForm({
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -64,15 +60,6 @@ export function ConfigurationForm({
       className="form-stack"
       onSubmit={handleSubmit((value) => mutation.mutate(value))}
     >
-      <label className="subscription-option">
-        <Checkbox
-          checked={watch("enabled")}
-          onCheckedChange={(checked) => setValue("enabled", checked === true)}
-        />
-        <span>
-          Endpoint enabled<small>Applies to future deliveries.</small>
-        </span>
-      </label>
       <div className="form-columns">
         {fields.map((field) => (
           <Field
@@ -92,8 +79,8 @@ export function ConfigurationForm({
         ))}
       </div>
       <p className="field-hint">
-        Settings are saved now for the future delivery worker. Changing them
-        will apply to new deliveries.
+        Settings update in place and apply to newly accepted requests.
+        Queued work keeps its original configuration.
       </p>
       <ErrorMessage error={mutation.error} />
       <div className="dialog-actions">

@@ -18,6 +18,9 @@ export const keysApi = {
         `/applications/${appId}/api-keys/${id}/rotate`,
       )
     ).data,
+  update: async (appId: string, id: string, body: { name: string }) =>
+    (await client.put<ApiKey>(`/applications/${appId}/api-keys/${id}`, body))
+      .data,
   revoke: async (appId: string, id: string) => {
     await client.delete(`/applications/${appId}/api-keys/${id}`);
   },

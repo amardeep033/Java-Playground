@@ -23,8 +23,8 @@ public class ApplicationController {
     }
 
     @GetMapping("")
-    public Responses.PageResult<Responses.App> list(@PathVariable UUID userId, @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.listApplications(userId, pageable);
+    public Responses.PageResult<Responses.App> list(@PathVariable UUID userId, @RequestParam(defaultValue="") String q, @RequestParam(defaultValue="") String status,@RequestParam(required=false) UUID clientId, @PageableDefault(sort = "createdAt") Pageable pageable) {
+        return service.listApplications(userId, q, status, clientId,pageable);
     }
     
     @GetMapping("/{applicationId}")
@@ -37,4 +37,9 @@ public class ApplicationController {
     public void delete(@PathVariable UUID userId, @PathVariable UUID applicationId) {
         deletion.deleteApplication(userId, applicationId);
     }
+    @PutMapping("/{applicationId}")
+    public Responses.App update(@PathVariable UUID userId, @PathVariable UUID applicationId, @Valid @RequestBody UpdateApplication request) {
+        return service.updateApplication(userId, applicationId, request);
+    }
+
 }

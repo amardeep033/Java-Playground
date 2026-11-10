@@ -4,10 +4,14 @@ import {
   Navigate,
   Link,
   useRouteError,
+  useParams,
 } from "react-router-dom";
 import { Loading } from "@/components/shared/feedback";
 import { Button } from "@/components/ui/button";
 const Welcome = lazy(() => import("@/features/auth/welcome-page"));
+const IncomingRequests = lazy(
+  () => import("@/features/incoming/incoming-requests-page"),
+);
 const Layout = lazy(() => import("@/app/layouts/workspace-layout"));
 const Applications = lazy(
   () => import("@/features/applications/applications-page"),
@@ -24,10 +28,13 @@ const Deliveries = lazy(() => import("@/features/activity/deliveries-page"));
 const DeliveryDetails = lazy(
   () => import("@/features/activity/delivery-detail-page"),
 );
-const Settings = lazy(() => import("@/features/settings/settings-page"));
+const ClientUsers = lazy(() => import("@/features/workspaces/client-users-page"));
+const Home = lazy(() => import("@/app/layouts/workspace-layout").then(module=>({default:module.WorkspaceHome})));
+const Audit = lazy(() => import("@/features/workspaces/audit-page"));
 const load = (element: React.ReactNode) => (
   <Suspense fallback={<Loading />}>{element}</Suspense>
 );
+function AuditRedirect() {const {userId}=useParams();return <Navigate to={`/users/${userId}/audit-logs`} replace/>;}
 function RouteError() {
   const error = useRouteError();
   return (
@@ -49,11 +56,19 @@ export const router = createBrowserRouter([
     element: load(<Layout />),
     errorElement: <RouteError />,
     children: [
-      { index: true, element: <Navigate to="applications" replace /> },
+      { index: true, element: <Navigate to="overview" replace /> },
       { path: "applications", element: load(<Applications />) },
-      { path: "settings", element: load(<Settings />) },
+      { path: "overview", element: load(<Home />) },
+      { path: "settings", element: <div/> },
+      { path: "audit-logs", element: load(<Audit />) },
+      { path: "clients/:clientId", element: load(<ClientUsers />) },
+      { path: "clients/:clientId/audit-logs", element: <AuditRedirect/> },
       { path: "apps/:appId/overview", element: load(<Overview />) },
       { path: "apps/:appId/events", element: load(<ActivityEvents />) },
+      {
+        path: "apps/:appId/incoming-requests",
+        element: load(<IncomingRequests />),
+      },
       { path: "apps/:appId/events/:eventId", element: load(<EventDetails />) },
       { path: "apps/:appId/deliveries", element: load(<Deliveries />) },
       {
@@ -67,6 +82,8 @@ export const router = createBrowserRouter([
       { path: "apps/:appId/event-types", element: load(<Events />) },
       { path: "apps/:appId/endpoints", element: load(<Endpoints />) },
       { path: "apps/:appId/api-keys", element: load(<Keys />) },
+      { path: "apps/:appId/members", element: <Navigate to="../../../overview" replace /> },
+      { path: "apps/:appId/audit-logs", element: <AuditRedirect/> },
     ],
   },
   {

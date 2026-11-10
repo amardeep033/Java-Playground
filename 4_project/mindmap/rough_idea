@@ -85,6 +85,8 @@ third phase:
 - clickhouse
 - rust 
 - cdc instead of loop for clearing outbox and kafka
+- event name rename and migration 
+- grpc 
 
 reasoning:
 - first of all, below all points are for handling negative scenarios and not for happy path

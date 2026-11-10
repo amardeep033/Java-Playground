@@ -23,19 +23,21 @@ class RegistrationServiceTest {
     @Mock EndpointRepository endpoints;
     @Mock ResourceAccess access;
     @Mock com.eventrelay.servicea.security.SecretEncryption encryption;
+    @Mock com.eventrelay.servicea.workspace.AuditLogs audit;
+    @Mock org.springframework.jdbc.core.JdbcTemplate db;
     RegistrationService service;
     UUID appId = UUID.randomUUID();
     PasswordEncoder passwords = Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8();
 
     @BeforeEach
     void setUp() {
-        service = new RegistrationService(users, applications, eventTypes, endpoints, passwords, access, encryption, org.mockito.Mockito.mock(com.eventrelay.servicea.auth.AuthService.class));
+        service = new RegistrationService(users, applications, eventTypes, endpoints, passwords, access, encryption,audit,db);
     }
 
     @Test
     void normalizesEmailBeforeSaving() {
         when(users.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
-        var response = service.registerUser(new RegisterUser(" Alice ", "Alice@EXAMPLE.com", "ExamplePass123!"));
+        var response = service.registerUser(new Signup(" Alice ","Acme", "Alice@EXAMPLE.com", "ExamplePass123!"));
         assertEquals("alice@example.com", response.email());
         assertEquals("Alice", response.name());
         var saved = ArgumentCaptor.forClass(UserAccount.class);
@@ -79,7 +81,7 @@ class RegistrationServiceTest {
     @Test
     void missingUserCannotRegisterAnApplication() {
         UUID userId = UUID.randomUUID();
-        when(access.lockedUser(userId)).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
+        when(access.user(userId)).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.registerApplication(userId, new RegisterApplication("Shop")));
         assertEquals(404, error.getStatusCode().value());

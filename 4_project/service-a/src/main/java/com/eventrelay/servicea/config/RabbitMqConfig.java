@@ -30,13 +30,13 @@ public class RabbitMqConfig {
                 BindingBuilder.bind(main).to(delivery).with("delivery.requested"),
                 BindingBuilder.bind(delayed).to(retry).with("delivery.retry"),
                 BindingBuilder.bind(dlq).to(dead).with("delivery.dead"),
-                BindingBuilder.bind(updates).to(status).with("delivery.updated"),
+                BindingBuilder.bind(updates).to(status).with("delivery.completed"),
                 BindingBuilder.bind(statusDlq).to(dead).with("status.dead"));
     }
     @Bean ThreadPoolTaskScheduler taskScheduler() {
         var scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(1);
-        scheduler.setThreadNamePrefix("outbox-poller-");
+        scheduler.setPoolSize(2);
+        scheduler.setThreadNamePrefix("service-a-worker-");
         scheduler.setWaitForTasksToCompleteOnShutdown(true);
         scheduler.setAwaitTerminationSeconds(10);
         return scheduler;

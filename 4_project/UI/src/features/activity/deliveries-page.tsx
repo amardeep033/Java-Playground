@@ -1,4 +1,5 @@
-import { useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search, AlertCircle } from "lucide-react";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
@@ -52,6 +53,7 @@ function DeliveriesContent({ failed }: { failed: boolean }) {
         },
         signal,
       ),
+    placeholderData:previous=>previous,
     staleTime: 1000,
     refetchInterval: 3000,
   });
@@ -88,20 +90,8 @@ function DeliveriesContent({ failed }: { failed: boolean }) {
             />
             Include replayed
           </label>
-        ) : (
-          <select
-            className="input filter-select"
-            aria-label="Delivery status"
-            value={status}
-            onChange={(event) => filter("status", event.target.value)}
-          >
-            <option value="">All statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="RETRY_SCHEDULED">Retry scheduled</option>
-            <option value="SUCCEEDED">Succeeded</option>
-            <option value="DEAD">Failed</option>
-          </select>
-        )}
+        ) : null}
+
         <LiveRefresh
           refreshing={query.isFetching}
           refresh={() => void query.refetch()}
@@ -117,6 +107,7 @@ function DeliveriesContent({ failed }: { failed: boolean }) {
           page={page}
           onPage={(value) => filter("page", String(value))}
           failed={failed}
+          status={status} onStatus={value=>filter("status",value)}
         />
       )}
     </>
@@ -127,16 +118,19 @@ export default function DeliveriesPage({
 }: {
   failed?: boolean;
 }) {
-  const { app } = useWorkspace();
+  const { user,app } = useWorkspace();
+  const [params]=useSearchParams();
+  const next=new URLSearchParams(); for(const key of ["eventId","endpointId"]) if(params.get(key)) next.set(key,params.get(key)!);
   return (
     <>
       <PageHeader
         eyebrow={app!.name}
         title={failed ? "Dead letters" : "Deliveries"}
+        action={!failed&&<Button asChild variant="outline"><Link to={`/users/${user.id}/apps/${app!.id}/dead-letters?${next}`}>Dead letters</Link></Button>}
         description={
           failed
             ? "Understand what failed. Choose what to send again."
-            : "Follow every destination, attempt, and outcome in real time."
+            : "Pending includes internal retries. Final outcomes and attempts appear after completion."
         }
       />
       <ActivityAccess>

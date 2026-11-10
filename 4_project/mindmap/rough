@@ -3,48 +3,388 @@ pgres cred:
 - spring.datasource.username=postgres
 - spring.datasource.password=postgres
 
-
-curl -i -X POST \
-  "http://localhost:8081/api/v1/applications/1b801c50-efcd-4b70-bfcc-5a3d5de0b68f/events" \
-  -H 'Content-Type: application/json' \
-  -H "X-API-Key: $API_KEY" \
-  -H "Idempotency-Key: test-$(date +%s)-$RANDOM" \
-  -d '{
-    "eventType": "test_event",
-    "payload": {
-      "orderId": "test-001",
-      "amount": 500
-    }
-  }'
-
-  
-User / Organization
-    └── Application
-          ├── API Keys
-          ├── Events
-          ├── Endpoints
-          │     ├── URL
-          │     ├── Signing Secret
-          │     └── Configuration
-          └── Receivers
-
-Already working:
-- Two Spring services with separate DB schemas.
-- Event ingestion → RabbitMQ → signed webhook delivery.
-- Outboxes, idempotency, deduplication, retries, DLQ and status updates.
-- Registration UI, applications, event types, endpoints, API keys, signing secrets and soft deletion.
-- Endpoint timeout, attempt limits and per-instance rate/concurrency limits.
-
-Main remaining work:
-- Redis caching, receiver-side rate limits and distributed delivery limits.
-- Circuit breakers and manual DLQ replay.
-- OpenTelemetry, Prometheus, Grafana, logs and latency metrics.
-- gRPC status reconciliation.
-- Login, cookies/JWT sessions and RBAC.
-- Receiver management and application-level settings.
-- App containers, Nginx, cloud deployment and enable/disable policy controls.
-
-The core delivery flow works. Most remaining effort is operational reliability, observability, security and completing the demo experience.
-
+amar@gmail.com
 123456789123
 er_CinVnDTBwkdfuJMsdq-gAnUNhftnVI4ybwWIHqL9qcI
+
+pagination is there in list apis : GET /api/v1/users/ffb80553-fc3a-4573-94ab-53d9e0270b53/applications?page=0&size=20
+-c = Cookie jar (write cookies)
+-b = Send cookies (read cookies)
+Why use both? Because your Event Relay authentication uses cookie-based sessions and CSRF protection.
+
+step1: get a token (csrf token--not in GET)
+step2: use token and create a user 
+step3: login using token(lookup because stateful -- session id--handled by cookie internally) and password 
+step4: all get without token and cookie handle session id all get without token and cookie handle session id, no password required -- checks internally in memory --- cookie is on file or browser 
+
+deleting one will delete all - but maintained in history
+session(cookie on browser) + auth me -- to not re login until cookie expires
+/auth/login-attempts -- profile and security
+
+Operation	Server	Client
+Logout	Invalidates current session	Clears current browser cookie
+Logout-all	Invalidates all user's sessions	Clears current browser cookie; other devices retain stale cookies
+
+UPDATE service_a.users
+SET role = 'ADMIN'
+WHERE email = 'your-email@example.com'
+  AND deleted_at IS NULL;
+UI needed
+
+
+
+
+
+
+api key -- trust who sends to me 
+ui -- session and password 
+Endpoint signing secret -- for cust to trust, we gen, give to user who in turn give to cust -- config like retry, timeout, conc, and rate limit
+
+Yes—there are still two authentication methods, using the same API paths:
+- Customer server	X-API-Key
+- Dashboard	HttpOnly JWT cookie + CSRF header for writes
+Revoking all application API keys blocks requests using those keys with 401. Dashboard users can still send events and replay eligible failures using their JWT cookie.
+
+replace auth via session based cookie because each time lookup in memory + dont scale good:
+JWT in memory + Bearer header → refresh loses the token.
+JWT in localStorage + Bearer header → theft higher + csrf low
+JWT in HttpOnly cookie → theft low + csrf higher
+JWT in HttpOnly cookie + CSRF protection:: The JWT will stay in an HttpOnly cookie and won’t appear in response bodies or browser storage. Writes—including login and logout—will require a CSRF token from /auth/csrf. I’m using
+
+localStorage vs memory vs HttpOnly cookie = where credentials are stored.
+Bearer vs Cookie = how credentials are transmitted.
+JWT vs Session ID = what credential the backend validates.
+
+user 
+
+app
+
+eventtype
+endpoint
+
+event
+delivery
+
+With one row per attempt, delivery-level fields would repeat, and listing current deliveries would require selecting or calculating the latest state. Two tables keep current state and complete history easy to query.
+
+Factor	Prefer View	Prefer Projection Table
+Query frequency	Infrequent reports	Frequently accessed reports
+Query cost	Cheap joins and aggregations	Expensive joins, aggregations, calculations
+Data volume	Small/moderate datasets	Large datasets
+Freshness	Must reflect latest committed data	Small, acceptable delay
+Query patterns	Many different filters and combinations	Repeated, predictable report structure
+
+Idempotency-Key is mandatory when submitting an event, for both API-key and dashboard callers
+
+---------------
+
+received_events/replay_requests
+delivery_projections
+outbox_messages
+
+status_inbox (deduplication)
+update delivery_projections
+insert delivery_attempt_projections (auto retries by service B)
+
+-----------------
+
+
+**how to handle delete and update (versioning?)**
+
+No. received_events.deleted_at does not copy deletion timestamps from the application, endpoint, or event type.
+Currently:
+- Deleting an event type or endpoint leaves existing events and delivery history visible.
+- Deleting an application/user makes its history inaccessible through normal APIs because parent-access checks fail. The event rows remain unchanged.
+So received_events.deleted_at is currently unused by deletion flows, although queries filter on it.
+
+deleting ep -- didnt remove event or delv
+deleting 
+app deletes all
+
+-----------------
+
+| Column | Meaning |
+|---|---|
+| `idempotency_key` | Key supplied for this replay request, separate from the original event’s key |
+| `source_delivery_id` | FK to the old failed delivery |
+| `delivery_id` | FK to the newly created replay delivery |
+and delivery_projection contains replay_of_id
+
+-----------------
+
+incoming requests
+Currently, an inactive endpoint is skipped when accepting a new event.
+OBSERVABILITY???
+
+-----------------------------------
+
+follow proper ui ux rules 
+- dont show Active Deactivate Edit Delete directly on card , click on edit should pop another layout for these stuff , copy id is fine
+- previous next should always be at bottom, irrespective of count of cards on the page 
+- too many blank space on right side , have proper symmetry everywhere 
+- have a dropdown at top right with app1, and so on -- for overall app context , dont hide app section on clicking applications or profile and security (it will show current selected app) 
+- have only pencil(edit), inside that active deactive delete edit and so on 
+- have prompts on delete with red, make use of colour for danger and so on 
+- organise left side menus in categories like app, account, configuration, monitoring and so on 
+- have profile where signout is (and on clicking on profile -- asks edit, signout and hover shows username and role) at bottom left
+- have a check like this overall for ui-ux rules and implement them 
+
+-----------------------------------
+
+csrf token(header + no time) -- Browser session
+jwt (expiry in itself) -- in cookie -- 15min
+cookie (expiry in set) -- in browser -- 15min
+*refresh token -- keeps logged in when token rotates
+
+in csrf -- other website asks browser to send req to target website -- the request passes as cookie is stored in browser 
+
+State-changing requests must include this token to be validated by the server
+the application explicitly grabs the token from the page code and sends it along
+When a hacker triggers a request from a separate malicious site, their script cannot read the HTML or access the JavaScript environment of your bank.com session
+
+
+-----------------------------------
+
+Whenever some clients come - they create an account with own name and company name 
+This creates their admin level account
+Admin can create normal user account and map them to app
+they can also create and manage app and map user to app 
+admin can promote normal user to admin
+so its like 
+1 client - k apps - n admin - m users 
+all n admin can access all k apps and have same privilege 
+user within given app has same privilege
+so there are two ui -- admin and normal user (same login)
+no create account for normal user -- only inside admin login -- register email and password, role and apps mapping
+
+we developers/owner dont have any UI or role in db -- we can change anything using db
+so two roles (admin and user) and two UI
+
+lets focus on updates of these columns: 
+users.email -- in place, no versioning + only admin can  + audit
+users.role -- in place, no versioning + only admin can  + audit
+users.name -- in place, no versioning + admin all and anybody can update own  + no audit
+users.password -- in place, no versioning + admin all and anybody can update own + audit logs without password
+
+app.is_active -- in place, no versioning + only admin can + audit logs
+app.name -- in place, no versioning + only admin can + audit logs
+app.desc -- in place, no versioning + only admin can + no audit
+
+api_keys.name -- in place, no versioning + anybody can + audit logs
+
+*event_type.name -- Not at all possible since contract -- so while creating prompt warning
+event_type.is_active -- in place, no versioning + only admin can + audit logs
+event_type.desc -- in place, no versioning + anybody can + no audit
+
+endpoint.name -- in place, no versioning + anybody can + audit logs
+endpoint.url -- versioned + only admin can + audit logs
+endpoint.is_active -- in place, no versioning + only admin can + audit logs
+endpoint.configs col -- versioned + anybody can + audit logs
+
+endpt_event_typs.mapping -- versioned(not separate - same endpoint version like configs) + only admin can + audit logs
+
+so 
+1. two types of role: user < admin 
+2. we will have one table called audit_logs
+3. Filter records by workspace membership and permissions on the backend. Don't rely on frontend filtering. Also, don't expose sensitive old/new values such as passwords, API keys or signing secrets.
+4. For a given endpoint, only one configuration version should be the current active version at a time.
+5. a user who is admin is admin for all app and a user who is normal is normal for all app, keep it simple
+6. maintain a client table too with org/company name -- everything isolated by it at first level -- so that we can optimise db in future like partition and all
+Note: we are already capturing all incoming request with error -- so things not versioned like app is active, event is active wont matter as we have audit logs + incoming request list with rejection reason
+
+
+-------------
+
+
+service b updates own db and raises completion(success/fail) event only for final status (not for internal retry)
+service a recieves event and updates own db too
+reconcilation is periodic running in service a for missed event and only for final status
+reconcilation strictly only moves to status forward -- we only pick final success or fail with retry exhausted or permanent fail -- have a flag in service b status to know its final  
+dont scan the entire delivery table every minute instead, introduce a reconciliation cursor using timestamp
+
+service a also maintain status as read projection, not the source of truth for latency, reporting, and query efficiency 
+keep API rest only , will convert to grpc in future for inter service communication
+
+----------------
+
+in UI, 
+there is only one screen in menu for audit logs with all audit shown with filter and search and so on , not like company audit logs in user and access currently 
+
+have menu like this in order
+1. overview
+2. monitoring 
+2.1 incoming requests -- from here can jump to events
+2.2 events -- from here can jump to deliveries
+2.3 deliveries -- from here can jump to dead letters
+2.4 dead letters
+3. configuration
+3.1 api key
+3.2 event
+3.3 endpoint (with event mapping)
+4. workspace (only appears in admin login)
+4.1 user and access (no separate app access)
+4.2 applications 
+4.3 audit logs -- shows current app + overall audit logs like user management
+
+Bottom. profile and security as overlay cards not as menu -- directly from profile at bottom 
+
+in list dont have -> , clicking on that column itself should open or jump 
+also on edit open a single form , not like click on Email & role to edit them -- you can have separated out section with save in same card if needed
+have the categories as dropdown 
+also from user -- dont show applications menu 
+
+-----------------------
+
+last user delete
+cascade delete -- what all
+incoming requests UI --- wf?
+
+--------------------
+
+2+2 hours
+- api and tables file revamp 
+
+- cross check update and versioning 
+- test reconcilation 
+
+-------
+
+2+2 hours
+- service b
+- code
+
+- feature list
+
+--------------------
+
+Because they have different security requirements:
+- Update name: ordinary profile edit; no audit required.
+- Change password: verifies the current password, hashes the new password, records an audit without password values, and revokes all refresh-token families.
+Separate paths keep these rules clear and prevent ordinary profile updates from accidentally changing credentials.
+
+Returning apps with every user would load potentially large, repeated lists even when you only want the user list.
+
+active inactive for user, api keys account
+
+active makes all inactive?
+
+lets remove versuoning all together from endpoints and treat it like others 
+but clearly in audit change capture stuffs like endpoint updated, config updated or event type mappings updated 
+also in app -- once a request is accepted -- it will follow whatever was at that time -- and not the updated one
+
+payload copied in tables -- 
+
+what if n number of service b for reconcilations? 
+
+--------------------
+
+Deleting the last user- payload at two places : received events(not incoming) and outbox message
+explain both reasoning 
+- The last company ADMIN cannot be deleted or demoted: returns 409 Conflict — “Keep at least one company ADMIN.”
+- The last normal USER can be soft-deleted. Their app mappings and refresh access are revoked; company apps and history remain.
+
+Making an app inactive
+- Only the app’s is_active becomes false.
+- Endpoints, event types, API keys and mappings retain their own states.
+- New event submissions and replays are blocked.
+- Already accepted deliveries and retries continue using their saved settings.
+- Configuration and history remain visible.
+- Reactivating the app allows new submissions; rejected requests are not automatically processed.
+
+- It works with N Service B instances, provided they share the same Service B database.
+
+- For login lockouts, keep locked_until. Temporary lockout recovers automatically—for example, after 5 wrong passwords, block login for 15 minutes.
+
+- Yes, exactly! With refresh token rotation, both the access JWT and the refresh token are replaced.
+- refresh_token_families = one login’s lifetime and revocation state.
+- refresh_tokens = individual tokens issued during that login.
+
+--------------------
+
+They serve different purposes:
+- requested_application_id records which app the caller targeted—even if the ID is unknown or invalid.
+- application_id is a foreign key to an existing app. It is NULL when the requested app cannot be resolved.
+Example:
+Request target	requested_application_id	application_id
+Existing app	Requested UUID	Same UUID
+Unknown app	Requested UUID	NULL
+Malformed ID	INVALID_APPLICATION_ID	NULL
+
+
+This preserves rejected-request tracking without breaking the foreign-key constraint.
+
+Table	Fields	Verdict	Why
+incoming_requests	requested_application_id + application_id	Keep	Original input versus successfully resolved FK. Preserves malformed and unknown IDs for audit.
+received_events	event_type_id + event_type	Keep	FK to the event type versus immutable routing-name snapshot.
+delivery_projections	endpoint_id + endpoint_url	Keep	Endpoint identity versus destination URL at delivery creation. Historical deliveries must not change when the endpoint URL changes.
+incoming_requests	api_key_id + api_key_name	Keep	Key identity versus historical display name. Renaming a key should not rewrite old request history.
+audit_logs	application_id + client_id	Keep with rationale	Application scope versus mandatory company scope. client_id is derivable for app-level logs, but useful for company-level logs where application_id is NULL.
+workspace_members	client_id + user_id + application_id	Keep	client_id is technically derivable, but supports composite foreign keys that prevent cross-company mappings.
+delivery_projections	attempt_count + attempt rows	Keep	Summary value for frequent dashboard reads versus detailed attempt history.
+delivery_projections	http_status / last_error + attempt history	Keep, conditionally	Useful denormalized latest-attempt summary. Avoid joining the attempt table for every delivery-list query.
+received_events	delivery_count + delivery records	Keep with clearer name	It records the initial active destination count, not necessarily the current number of deliveries after replays.
+
+Point	Current finding
+endpoints.is_active vs configuration.enabled	Already one DB column. enabled is an API alias, not separately stored state.
+login_attempts.success	Redundant. Can derive it from reason = 'SUCCESS' while preserving the UI response field.
+A’s next_attempt_at	Remove candidate. Always NULL under final-only synchronization. Keep B’s retry scheduling field.
+Unused deleted_at fields	Cleanup candidates in A’s delivery projections, received events and outbox. They currently have query references but no implemented deletion lifecycle.
+delivery_count	Rename to initial_delivery_count for clarity.
+Projection updated_at → last_synced_at	Incorrect rename. It currently contains B’s finalization timestamp, not when A synchronized. Use finalized_at for that meaning; record synchronization time separately only if needed.
+last_sequence	Potentially unnecessary with immutable final outcomes and message deduplication; removing it requires updating the synchronization contract and guards.
+Missing attempt synchronization	Already handled. Both RabbitMQ completion messages and REST reconciliation include complete attempt history.
+Preserving malformed app IDs	Malformed input becomes INVALID_APPLICATION_ID; the original malformed string is not retained.
+
+
+Two additional redundancies remain:
+- replay_requests.source_delivery_id duplicates the relationship in delivery_projections.replay_of_id.
+- Individual user/application foreign keys in workspace_members overlap with its composite company foreign keys.
+Keep the historical snapshots, tenant-scope fields and delivery summaries. No files or database structures changed.
+
+- payload at two places : received events(not incoming) and outbox message
+
+--------------------
+
+Approximately 65% complete through Phase 2, counting both Phase 1 and Phase 2 requirements. This is an effort-based estimate, not a measured score.
+Area	Current status
+A/B services, PostgreSQL, RabbitMQ	Implemented
+Idempotency, inbox/outbox, retries, DLQ, replay	Implemented
+Final-status projections and cursor-based reconciliation	Implemented
+React UI, JWT cookies, refresh tokens, RBAC, company isolation	Implemented
+Configuration, audit logs, incoming-request tracking	Implemented
+B endpoint rate/concurrency limits	Partial: per-instance only
+Redis caching and distributed limits	Missing
+Endpoint circuit breaker	Missing
+OpenTelemetry, Prometheus, Grafana	Missing
+Docker deployment, Nginx, cloud hosting	Mostly missing; RabbitMQ container setup exists
+User-selectable pause/resume policies	Missing; fixed behavior is implemented
+
+
+To finish through Phase 2:
+1. Redis and traffic limits
+   - A: application/endpoint ingestion limits.
+   - B: shared endpoint rate/concurrency limits across instances.
+   - Cache appropriate configuration with TTL, eviction and invalidation.
+2. Endpoint circuit breaker
+   - Open after repeated failures, then allow recovery probes.
+3. Observability
+   - Metrics, including request/delivery counts and p95 latency.
+   - Traces and correlated logs.
+   - Prometheus collection and Grafana dashboards.
+4. Deployment
+   - Containerize A, B and UI.
+   - Add deployment Compose configuration, Nginx and HTTPS.
+   - Deploy and verify persistence, secrets and restart behavior.
+5. Pause/resume policy
+   - Currently: accepted work continues; inactive resources block new work; reactivation does not automatically replay failures.
+   - Phase 2’s selectable policy remains unimplemented. Keeping the current fixed policy would require updating that scope item.
+gRPC is excluded from this estimate because your roadmap places it in Phase 3.
+
+| Service | Work | Current configuration |
+| --- | --- | --- |
+| A | HTTP REST: customer events and UI APIs | Up to **32 request threads** |
+| A | RabbitMQ: final status updates from B | **4 listener threads** |
+| A | Outbox publishing + reconciliation | **2 shared scheduler threads** |
+| B | RabbitMQ: receive commands and send webhooks on the same listener thread | **4 listener threads** |
+| B | HTTP REST: completion/status feed for A | Up to **16 request threads** |
+| B | Outbox publishing | **1 scheduler thread** |

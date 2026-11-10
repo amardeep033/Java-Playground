@@ -1,12 +1,15 @@
+import { useState } from "react";
+import { ListFilters } from "@/components/shared/list-filters";
+import { ResourceSettings } from "@/components/shared/resource-settings";
+import { useDebounced } from "@/features/activity/shared";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { DeleteResource } from "@/components/shared/delete-resource";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LockKeyhole, Moon, Sun, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
-import { useTheme } from "@/app/providers/app-providers";
 import { passwordSchema, type PasswordValues } from "@/features/auth/schemas";
 import { authApi, usersApi } from "@/features/auth/api";
 import { PageHeader } from "@/components/shared/page-header";
@@ -15,23 +18,15 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Timestamp } from "@/features/activity/shared";
 import { date, initials } from "@/lib/utils";
-export default function SettingsPage() {
+export default function SettingsPage({overlay=false}:{overlay?:boolean}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useWorkspace();
-  const { dark, toggle } = useTheme();
-  const session = useQuery({ queryKey: ["session"], queryFn: authApi.me });
+  const { user, canManageUsers } = useWorkspace();
+  const [search, setSearch] = useState("");
+  const q = useDebounced(search);
   const attempts = useQuery({
-    queryKey: ["login-attempts", user.id],
-    queryFn: authApi.attempts,
-  });
-  const logout = useMutation({
-    mutationFn: () => authApi.logout(true),
-    onSuccess: async () => {
-      await queryClient.cancelQueries();
-      queryClient.clear();
-      navigate("/", { replace: true });
-    },
+    queryKey: ["login-attempts", user.id, q],
+    queryFn: () => authApi.attempts(q),
   });
   const {
     register,
@@ -45,67 +40,41 @@ export default function SettingsPage() {
     onSuccess: () => {
       reset();
       queryClient.clear();
-      navigate("/", { replace: true });
+      navigate("/", {
+        replace: true,
+      });
     },
   });
   return (
     <>
-      <PageHeader
+      {!overlay && <PageHeader
         title="Profile & security"
         description="Your workspace identity, credentials, and preferences."
-      />
+      />}
       <div className="settings-stack">
-        <section className="panel appearance-panel">
-          <div>
-            <h2>Delete account</h2>
-            <p className="muted">
-              Removes your workspace and all applications from active use.
-            </p>
-          </div>
-          <DeleteResource
-            name="account"
-            label="Delete account"
-            description="Your account, applications, endpoints, event types and keys will be soft-deleted. Their history is retained. This cannot be undone in the UI."
-            remove={() => usersApi.remove(user.id)}
-            onDeleted={() => {
-              queryClient.clear();
-              navigate("/");
-            }}
-          />
-        </section>
         <section className="panel">
           <div className="panel-heading">
             <h2>
               <UserRound size={17} />
               Profile
             </h2>
-            <span className="badge">Registered {date(user.createdAt)}</span>
-          </div>
-          <div className="profile-summary">
-            <span className="profile-avatar">{initials(user.name)}</span>
-            <div>
-              <h3>{user.name}</h3>
-              <p>{user.email}</p>
-            </div>
-          </div>
-          <dl className="profile-id">
-            <dt>
-              Your user ID{" "}
-              <span className="muted">· Your account identifier</span>
-            </dt>
-            <dd className="id-detail">
-              <code>{user.id}</code>
-              <CopyButton value={user.id} />
-            </dd>
-          </dl>
-        </section>
-        <section className="panel">
-          <div className="panel-heading">
-            <h2>
-              <LockKeyhole size={17} />
-              Change password
-            </h2>
-          </div>
+            <div className="profile-controls">
+              <span className="badge">Registered {date(user.createdAt)}</span>
+              <ResourceSettings
+                name={user.name}
+                metadata={{
+                  title: "Edit profile",
+                  name: user.name,
+                  editName: true,
+                  save: (body) => usersApi.update(user.id, { name: body.name! }),
+                  onSaved: () => {
+                    void queryClient.invalidateQueries({ queryKey: ["user", user.id] });
+                    void queryClient.invalidateQueries({ queryKey: ["session"] });
+                  },
+                }}
+              >
+                <>
+                  <section className="editor-section"><h3>Change password</h3><p className="muted">Changing your password signs you out and prevents renewal on your other devices.</p>
           <form
             className="form-stack password-form"
             onSubmit={handleSubmit((values) => {
@@ -152,34 +121,58 @@ export default function SettingsPage() {
               </Field>
             </div>
             <ErrorMessage error={mutation.error} />
-            <div>
+            <div className="dialog-actions">
               <Button disabled={mutation.isPending}>Update password</Button>
             </div>
           </form>
-        </section>
-        <section className="panel">
-          <div className="panel-heading">
-            <h2>Session & access</h2>
-            <span className="badge">{session.data?.role || "USER"}</span>
+                  </section>
+                  <div className="danger-zone">
+                    <h3>Delete account</h3>
+                    <p>Permanently removes your account from the UI. Company applications remain. Keep at least one company ADMIN.</p>
+                    <DeleteResource
+                      name="account"
+                      label="Delete account"
+                      description="Your account access will be removed. Company applications remain. Keep at least one company ADMIN. History is retained. This cannot be undone in the UI."
+                      remove={() => usersApi.remove(user.id)}
+                      onDeleted={() => {
+                        queryClient.clear();
+                        navigate("/");
+                      }}
+                    />
+                  </div>
+                </>
+              </ResourceSettings>
+            </div>
           </div>
-          <p className="muted">
-            {session.data?.role === "ADMIN"
-              ? "Administrator: manage applications across workspaces."
-              : "User: manage only your own workspace and applications."}
-          </p>
-          <p className="muted">
-            Session expires{" "}
-            {session.data ? <Timestamp value={session.data.expiresAt} /> : "—"}.
-            Password changes sign out all sessions.
-          </p>
-          <ErrorMessage error={logout.error} />
-          <Button
-            variant="outline"
-            disabled={logout.isPending}
-            onClick={() => logout.mutate()}
-          >
-            Sign out all sessions
-          </Button>
+          <div className="profile-summary">
+            <span className="profile-avatar">{initials(user.name)}</span>
+            <div>
+              <h3>{user.name}</h3>
+              <p>{user.email}</p>
+            </div>
+          </div>
+          <dl className="profile-id">
+            <dt>
+              Your user ID{" "}
+              <span className="muted">· Your account identifier</span>
+            </dt>
+            <dd className="id-detail">
+              <code>{user.id}</code>
+              <CopyButton value={user.id} />
+            </dd>
+          </dl>
+          <div className="profile-access">
+            <div className="panel-heading">
+              <h3>Account access</h3>
+              <span className="badge">{user.role}</span>
+            </div>
+            <p className="muted">
+              {canManageUsers ? "Company administrator: manage your company’s users and applications." : "Access the applications assigned to you by your company administrator."}
+            </p>
+            <p className="muted">
+              Your login renews automatically for up to 30 days. Signing out ends renewal.
+            </p>
+          </div>
         </section>
         <section className="panel">
           <div className="panel-heading">
@@ -192,6 +185,11 @@ export default function SettingsPage() {
             Last 20 attempts. Five failed passwords within 15 minutes lock login
             for 15 minutes.
           </p>
+          <ListFilters
+            label="login attempts"
+            search={search}
+            onSearch={setSearch}
+          />
           <ErrorMessage
             error={attempts.error}
             retry={() => void attempts.refetch()}
@@ -216,7 +214,9 @@ export default function SettingsPage() {
                         ? "Successful"
                         : attempt.reason === "LOCKED"
                           ? "Login locked"
-                          : "Wrong email or password"}
+                          : attempt.reason === "ROLE_DENIED"
+                            ? "Admin access denied"
+                            : "Wrong email or password"}
                     </td>
                     <td>
                       <code>{attempt.ip_address}</code>
@@ -227,17 +227,8 @@ export default function SettingsPage() {
             </table>
           </div>
         </section>
-        <section className="panel appearance-panel">
-          <div>
-            <h2>Appearance</h2>
-            <p className="muted">A workspace that feels like yours.</p>
-          </div>
-          <Button variant="outline" onClick={toggle}>
-            {dark ? <Sun size={16} /> : <Moon size={16} />}Use{" "}
-            {dark ? "light" : "dark"} theme
-          </Button>
-        </section>
       </div>
+
     </>
   );
 }

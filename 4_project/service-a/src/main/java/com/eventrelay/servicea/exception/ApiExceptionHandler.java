@@ -1,6 +1,7 @@
 package com.eventrelay.servicea.exception;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import static com.eventrelay.servicea.ingress.IncomingRequestContext.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,6 +16,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> validation(MethodArgumentNotValidException ex) {
+        reason(Reason.INVALID_FIELDS);
         var problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Request validation failed");
         Map<String, String> errors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error -> errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
@@ -25,5 +27,10 @@ public class ApiExceptionHandler {
     public ResponseEntity<ProblemDetail> conflict(DataIntegrityViolationException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(
                 ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Registration conflicts with an existing record"));
+    }
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ProblemDetail> malformed(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        reason(Reason.MALFORMED_REQUEST);
+        return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,"Malformed or unreadable request body"));
     }
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { ErrorMessage } from "./feedback";
@@ -31,6 +31,7 @@ export function DeleteResource({
       <Button
         variant="ghost"
         size="sm"
+        className="danger-link delete-resource-trigger"
         onClick={() => {
           mutation.reset();
           setOpen(true);
@@ -45,7 +46,8 @@ export function DeleteResource({
           if (!mutation.isPending) setOpen(value);
         }}
       >
-        <DialogContent>
+        <DialogContent className="danger-dialog">
+          <div className="danger-icon"><AlertTriangle size={22} /></div>
           <DialogHeader title={`Delete ${name}?`} description={description} />
           <ErrorMessage error={mutation.error} />
           <div className="dialog-actions">
@@ -54,7 +56,7 @@ export function DeleteResource({
               disabled={mutation.isPending}
               onClick={() => setOpen(false)}
             >
-              Cancel
+              Keep resource
             </Button>
             <Button
               variant="destructive"

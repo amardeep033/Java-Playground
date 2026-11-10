@@ -1,33 +1,20 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
-import { PageHeader } from "@/components/shared/page-header";
-import { Button } from "@/components/ui/button";
 import {
   CopyButton,
   ErrorMessage,
   Loading,
 } from "@/components/shared/feedback";
-import { ActivityAccess } from "./access";
 import { activityApi } from "./api";
-import { DeliveriesTable } from "./deliveries-table";
-import { JsonPanel, LiveRefresh, StatusBadge, Timestamp } from "./shared";
-function EventContent() {
-  const { eventId = "" } = useParams();
+import { TrackingNav, TrackingNext } from "./tracking-nav";
+import { TrackingRedirect } from "./tracking-redirect";
+import { JsonPanel, StatusBadge, Timestamp } from "./shared";
+export function EventContent({eventId}:{eventId:string}) {
   const { app } = useWorkspace();
-  const [page, setPage] = useState(0);
   const query = useQuery({
     queryKey: ["activity", app!.id, "event", eventId],
     queryFn: ({ signal }) => activityApi.event(app!.id, eventId, signal),
-    staleTime: 1000,
-    refetchInterval: 3000,
-  });
-  const deliveries = useQuery({
-    queryKey: ["activity", app!.id, "event-deliveries", eventId, page],
-    queryFn: ({ signal }) =>
-      activityApi.deliveries(app!.id, { eventId, page, size: 20 }, signal),
     staleTime: 1000,
     refetchInterval: 3000,
   });
@@ -38,6 +25,10 @@ function EventContent() {
     );
   return (
     <>
+      <TrackingNav previous={query.data.incomingRequestId?{kind:"incoming",id:query.data.incomingRequestId}:undefined}>
+        <TrackingNext view={{kind:"deliveries",id:eventId}}>View in deliveries</TrackingNext>
+        {query.data.status!=="SUCCEEDED"&&<TrackingNext view={{kind:"dead-letters",id:eventId}}>View in dead letters</TrackingNext>}
+      </TrackingNav>
       <section className="panel event-identity">
         <div>
           <span className="eyebrow">{query.data.eventType}</span>
@@ -54,47 +45,10 @@ function EventContent() {
         </div>
       </section>
       <JsonPanel title="Event payload" value={query.data.payload} />
-      <div className="section-heading activity-section">
-        <h2>Delivery history</h2>
-        <LiveRefresh
-          refreshing={deliveries.isFetching}
-          refresh={() => {
-            void query.refetch();
-            void deliveries.refetch();
-          }}
-        />
-      </div>
-      {deliveries.isPending ? (
-        <Loading />
-      ) : deliveries.isError ? (
-        <ErrorMessage
-          error={deliveries.error}
-          retry={() => void deliveries.refetch()}
-        />
-      ) : (
-        <DeliveriesTable data={deliveries.data} page={page} onPage={setPage} />
-      )}
+
     </>
   );
 }
 export default function EventDetailPage() {
-  const { user, app } = useWorkspace();
-  return (
-    <>
-      <Button variant="ghost" size="sm" asChild>
-        <Link to={`/users/${user.id}/apps/${app!.id}/events`}>
-          <ArrowLeft size={14} />
-          All events
-        </Link>
-      </Button>
-      <PageHeader
-        eyebrow={app!.name}
-        title="Event details"
-        description="The original payload and the complete delivery history."
-      />
-      <ActivityAccess>
-        <EventContent />
-      </ActivityAccess>
-    </>
-  );
+ const {eventId=""}=useParams();return <TrackingRedirect kind="event" id={eventId} section="events"/>;
 }

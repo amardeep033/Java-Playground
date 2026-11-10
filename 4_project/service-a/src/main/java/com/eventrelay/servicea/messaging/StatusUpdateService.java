@@ -6,5 +6,5 @@ import com.eventrelay.servicea.events.EventStore;
 public class StatusUpdateService {
     private final EventStore store;
     public StatusUpdateService(EventStore store) { this.store = store; }
-    @Transactional public void apply(DeliveryStatusMessage message) { store.applyStatus(message); }
+    @Transactional public void apply(DeliveryStatusMessage message) { message.validate(); store.applyStatus(message); }
 }

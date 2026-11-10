@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useTracking } from "./tracking-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,15 +40,20 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 function SendForm({ onClose }: { onClose: () => void }) {
-  const { app, user } = useWorkspace();
+  const { app } = useWorkspace();
   const [typePage, setTypePage] = useState(0);
   const [requestKey] = useState(() => crypto.randomUUID());
   const [selectedName, setSelectedName] = useState("");
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const {open}=useTracking();
   const types = useQuery({
     queryKey: ["event-types", app!.id, "send", typePage],
-    queryFn: () => eventTypesApi.list(app!.id, { page: typePage, size: 20 }),
+    queryFn: () =>
+      eventTypesApi.list(app!.id, {
+        page: typePage,
+        size: 20,
+        status: "ACTIVE",
+      }),
   });
   const {
     register,
@@ -70,7 +75,7 @@ function SendForm({ onClose }: { onClose: () => void }) {
     onSuccess: (receipt) => {
       void queryClient.invalidateQueries({ queryKey: ["activity", app!.id] });
       onClose();
-      navigate(`/users/${user.id}/apps/${app!.id}/events/${receipt.id}`);
+      open({kind:"event",id:receipt.id});
     },
   });
   return (
@@ -161,7 +166,11 @@ function SendForm({ onClose }: { onClose: () => void }) {
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button disabled={mutation.isPending || !types.data?.totalElements}>
+        <Button
+          disabled={
+            mutation.isPending || !app?.active || !types.data?.totalElements
+          }
+        >
           <Send size={15} />
           {mutation.isPending ? "Sending…" : "Send event"}
         </Button>
@@ -170,10 +179,17 @@ function SendForm({ onClose }: { onClose: () => void }) {
   );
 }
 export function SendEventButton() {
+  const { app } = useWorkspace();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
+      <Button
+        disabled={!app?.active}
+        title={
+          !app?.active ? "Activate the application before sending" : undefined
+        }
+        onClick={() => setOpen(true)}
+      >
         <Send size={16} />
         Send event
       </Button>

@@ -1,4 +1,9 @@
-import { useState } from "react";
+import {statusColumn} from "@/components/shared/column-filter";
+import { ActivationToggle } from "@/components/shared/activation-toggle";
+import { ListFilters } from "@/components/shared/list-filters";
+import { ResourceSettings } from "@/components/shared/resource-settings";
+import { useDebounced } from "@/features/activity/shared";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -57,7 +62,7 @@ function CreateEventType({ onClose }: { onClose: () => void }) {
       <Field
         id="event-name"
         label="Event type name"
-        hint="A short, descriptive identifier for this event."
+        hint="Permanent routing contract: this name cannot be changed after creation. Create a new event type to use a different name."
         error={errors.name?.message}
       >
         <Input
@@ -111,6 +116,8 @@ function EventDetails({ id }: { id: string }) {
         <code>{query.data.id}</code>
         <CopyButton value={query.data.id} />
       </dd>
+      <dt>Status</dt>
+      <dd>{query.data.active ? "Active" : "Inactive"}</dd>
       <dt>Created</dt>
       <dd>{date(query.data.createdAt)}</dd>
     </dl>
@@ -118,75 +125,60 @@ function EventDetails({ id }: { id: string }) {
 }
 export default function EventTypesPage() {
   const queryClient = useQueryClient();
-  const { app } = useWorkspace();
+  const { app, canAdmin } = useWorkspace();
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const q = useDebounced(search);
+  const [status, setStatus] = useState("");
+
   const [create, setCreate] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ["event-types", app!.id, page],
-    queryFn: () => eventTypesApi.list(app!.id, { page, size: 20 }),
+    placeholderData:previous=>previous,
+    queryKey: ["event-types", app!.id, page, q, status],
+    queryFn: () => eventTypesApi.list(app!.id, { page, size: 20, q, status }),
   });
-  const columns: ColumnDef<EventType>[] = [
-    {
-      header: "Event type",
-      accessorKey: "name",
-      cell: ({ row }) => (
-        <button
-          className="resource-link"
-          onClick={() => setSelected(row.original.id)}
-        >
-          <span className="table-icon">
-            <Braces size={16} />
-          </span>
-          <code>{row.original.name}</code>
-        </button>
-      ),
-    },
-    {
-      header: "Description",
-      accessorKey: "description",
-      cell: ({ getValue }) => (
-        <span className="muted">{getValue<string>() || "—"}</span>
-      ),
-    },
-    {
-      header: "Created",
-      accessorKey: "createdAt",
-      cell: ({ getValue }) => date(getValue<string>()),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
+  const columns = useMemo<ColumnDef<EventType>[]>(
+    () => [
+      {
+        header: "Event type",
+        accessorKey: "name",
+        cell: ({ row }) => (
+          <button
+            className="resource-link"
             onClick={() => setSelected(row.original.id)}
           >
-            View details
-          </Button>
-          <DeleteResource
-            name={row.original.name}
-            description="Future subscriptions will no longer include this event type. Its history is retained."
-            remove={() => eventTypesApi.remove(app!.id, row.original.id)}
-            onDeleted={() => {
-              setPage(0);
-              void queryClient.invalidateQueries({
-                queryKey: ["event-types", app!.id],
-              });
-              void queryClient.invalidateQueries({
-                queryKey: ["endpoints", app!.id],
-              });
-              void queryClient.invalidateQueries({
-                queryKey: ["endpoint", app!.id],
-              });
-            }}
-          />
-        </div>
-      ),
-    },
-  ];
+            <span className="table-icon">
+              <Braces size={16} />
+            </span>
+            <code>{row.original.name}</code>
+          </button>
+        ),
+      },
+      {
+        header: "Description",
+        accessorKey: "description",
+        cell: ({ getValue }) => (
+          <span className="muted">{getValue<string>() || "—"}</span>
+        ),
+      },
+      {
+        header: "Created",
+        accessorKey: "createdAt",
+        cell: ({ getValue }) => date(getValue<string>()),
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => <ResourceSettings name={row.original.name} metadata={{title:"Edit event type",description:row.original.description,editDescription:true,
+          save:body=>eventTypesApi.update(app!.id,row.original.id,{description:body.description}),onSaved:()=>{void queryClient.invalidateQueries({queryKey:["event-types",app!.id]});void queryClient.invalidateQueries({queryKey:["event-type",app!.id]});}}}>
+          <ActivationToggle canChange={canAdmin} active={row.original.active} name={row.original.name} save={active=>eventTypesApi.setActive(app!.id,row.original.id,active)} />
+          {canAdmin && <div className="danger-zone"><h3>Delete event type</h3><p>Stops future events of this type. Existing event history remains.</p><DeleteResource name={row.original.name} description="Future subscriptions will no longer include this event type. History is retained; this cannot be undone in the UI." remove={()=>eventTypesApi.remove(app!.id,row.original.id)} onDeleted={()=>{setPage(0);void queryClient.invalidateQueries();}} /></div>}
+        </ResourceSettings>,
+      },
+    ],
+    [app!.id, canAdmin, queryClient],
+  );
   return (
     <>
       <PageHeader
@@ -200,12 +192,23 @@ export default function EventTypesPage() {
           </Button>
         }
       />
-      <div className="subtle-note">
-        <Braces size={17} />
-        <span>
-          Define once. Subscribe from any endpoint in this application.
-        </span>
-      </div>
+      <ListFilters hideStatus
+        label="event types"
+        status={status}
+        onStatus={(value) => {
+          setStatus(value);
+          setPage(0);
+        }}
+        options={[
+          { value: "ACTIVE", label: "Active" },
+          { value: "INACTIVE", label: "Inactive" },
+        ]}
+        search={search}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(0);
+        }}
+      />
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (
@@ -214,12 +217,16 @@ export default function EventTypesPage() {
         <DataTable
           data={query.data}
           columns={columns}
+          columnFilters={{status:statusColumn(status,value=>{setStatus(value);setPage(0);},undefined)}}
           page={page}
           onPage={setPage}
-          emptyTitle="Give your events a name"
+          emptyTitle={
+            q || status ? "No matching event types" : "Give your events a name"
+          }
           emptyDescription="Create an event type like order.created, then subscribe an endpoint to it."
         />
       )}
+
       <Dialog open={create} onOpenChange={setCreate}>
         <DialogContent>
           <DialogHeader

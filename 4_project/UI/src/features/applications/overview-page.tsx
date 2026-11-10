@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
-import { ArrowRight, Braces, Globe2, KeyRound } from "lucide-react";
+import { Braces, Globe2, KeyRound } from "lucide-react";
 import { useWorkspace } from "@/app/layouts/workspace-layout";
 import { PageHeader } from "@/components/shared/page-header";
 import { CopyButton, ErrorMessage } from "@/components/shared/feedback";
@@ -57,7 +57,7 @@ export default function OverviewPage() {
         description="Your integration, at a glance."
       />
       <ActivityAccess>
-        <ActivitySummary />
+        <ActivitySummary detailed />
       </ActivityAccess>
       <div className="section-heading activity-section">
         <h2>Application configuration</h2>
@@ -66,7 +66,7 @@ export default function OverviewPage() {
         {modules.map((module, i) => (
           <Link
             key={module.path}
-            className="stat-card"
+            className={`stat-card configuration-stat configuration-${module.path}`}
             to={`/users/${user.id}/apps/${id}/${module.path}`}
           >
             <div>
@@ -82,7 +82,6 @@ export default function OverviewPage() {
             </strong>
             <span className="stat-link">
               Manage {module.title.toLowerCase()}
-              <ArrowRight size={14} />
             </span>
           </Link>
         ))}
@@ -95,24 +94,9 @@ export default function OverviewPage() {
       )}
       <div className="overview-grid">
         <section className="panel">
-          <div className="panel-heading">
-            <h2>Build your integration</h2>
-            <span className="badge">Configuration</span>
-          </div>
-          {modules.map((module, i) => (
-            <Link
-              className="setup-row"
-              key={module.path}
-              to={`/users/${user.id}/apps/${id}/${module.path}`}
-            >
-              <span className="step-number">0{i + 1}</span>
-              <div>
-                <strong>{module.title}</strong>
-                <p>{module.description}</p>
-              </div>
-              <ArrowRight size={17} />
-            </Link>
-          ))}
+          <div className="panel-heading"><h2>Event flow</h2><span className="badge">Monitoring</span></div>
+          <p className="muted">Trace every accepted request through its destinations and final outcomes.</p>
+          {[{title:"Incoming requests",text:"Accepted and rejected submissions",path:"incoming-requests"},{title:"Events",text:"Validated payloads and destinations",path:"events"},{title:"Deliveries",text:"Final outcomes and attempt history",path:"deliveries"},{title:"Dead letters",text:"Inspect failures and replay",path:"dead-letters"}].map((stage,index)=><Link className="setup-row" key={stage.path} to={`/users/${user.id}/apps/${id}/${stage.path}`}><span className="step-number">{index+1}</span><div><strong>{stage.title}</strong><p>{stage.text}</p></div></Link>)}
         </section>
         <section className="panel details-panel">
           <div className="panel-heading">

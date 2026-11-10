@@ -24,7 +24,7 @@ class ApiKeyServiceTest {
     UUID keyId = UUID.randomUUID();
 
     @BeforeEach
-    void setUp() { service = new ApiKeyService(keys, access); }
+    void setUp() { service = new ApiKeyService(keys, access,mock(com.eventrelay.servicea.workspace.AuditLogs.class)); }
 
     @Test
     void creationStoresHashAndReturnsSecretOnce() throws Exception {

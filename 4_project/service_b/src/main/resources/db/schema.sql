@@ -1,62 +1,75 @@
 CREATE SCHEMA IF NOT EXISTS service_b;
 
 CREATE TABLE IF NOT EXISTS service_b.deliveries (
-    id uuid PRIMARY KEY,
+    id uuid NOT NULL,
     event_id uuid NOT NULL,
     application_id uuid NOT NULL,
     endpoint_id uuid NOT NULL,
     command jsonb NOT NULL,
-    status varchar(32) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','SUCCEEDED','RETRY_SCHEDULED','DEAD')),
-    attempt_count integer NOT NULL DEFAULT 0,
-    status_sequence bigint NOT NULL DEFAULT 0,
+    status character varying(32) DEFAULT 'PENDING'::character varying NOT NULL,
+    is_final boolean DEFAULT false NOT NULL,
+    finalized_at timestamp with time zone,
+    completion_message_id uuid,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    status_sequence bigint DEFAULT 0 NOT NULL,
     http_status integer,
-    last_error varchar(1000),
-    next_attempt_at timestamptz,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    deleted_at timestamptz,
-    UNIQUE (event_id, endpoint_id)
+    last_error character varying(1000),
+    next_attempt_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    replay_of_id uuid,
+    CONSTRAINT deliveries_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'SUCCEEDED'::character varying, 'RETRY_SCHEDULED'::character varying, 'DEAD'::character varying])::text[]))),
+    CONSTRAINT deliveries_final_check CHECK (is_final = (status IN ('SUCCEEDED','DEAD')) AND is_final = (finalized_at IS NOT NULL) AND is_final = (completion_message_id IS NOT NULL)),
+    CONSTRAINT deliveries_pkey PRIMARY KEY (id)
 );
-CREATE INDEX IF NOT EXISTS idx_deliveries_event ON service_b.deliveries(event_id);
+
 CREATE TABLE IF NOT EXISTS service_b.delivery_attempts (
-    id uuid PRIMARY KEY,
-    delivery_id uuid NOT NULL REFERENCES service_b.deliveries(id),
+    id uuid NOT NULL,
+    delivery_id uuid NOT NULL,
     attempt_number integer NOT NULL,
     http_status integer,
-    error varchar(1000),
-    started_at timestamptz NOT NULL,
-    completed_at timestamptz NOT NULL,
-    UNIQUE (delivery_id, attempt_number)
+    error character varying(1000),
+    started_at timestamp with time zone NOT NULL,
+    completed_at timestamp with time zone NOT NULL,
+    response_body text,
+    content_type character varying(256),
+    response_truncated boolean DEFAULT false NOT NULL,
+    CONSTRAINT delivery_attempts_delivery_id_attempt_number_key UNIQUE (delivery_id, attempt_number),
+    CONSTRAINT delivery_attempts_pkey PRIMARY KEY (id),
+    CONSTRAINT delivery_attempts_delivery_id_fkey FOREIGN KEY (delivery_id) REFERENCES service_b.deliveries(id)
 );
+
 CREATE TABLE IF NOT EXISTS service_b.delivery_inbox (
-    message_id uuid PRIMARY KEY,
-    delivery_id uuid NOT NULL REFERENCES service_b.deliveries(id),
-    processed_at timestamptz NOT NULL DEFAULT now()
+    message_id uuid NOT NULL,
+    delivery_id uuid NOT NULL,
+    processed_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT delivery_inbox_pkey PRIMARY KEY (message_id),
+    CONSTRAINT delivery_inbox_delivery_id_fkey FOREIGN KEY (delivery_id) REFERENCES service_b.deliveries(id)
 );
+
 CREATE TABLE IF NOT EXISTS service_b.outbox_messages (
-    id uuid PRIMARY KEY,
+    id uuid NOT NULL,
     aggregate_id uuid NOT NULL,
-    exchange_name varchar(120) NOT NULL,
-    routing_key varchar(120) NOT NULL,
+    exchange_name character varying(120) NOT NULL,
+    routing_key character varying(120) NOT NULL,
     payload jsonb NOT NULL,
-    attempt_count integer NOT NULL DEFAULT 0,
-    available_at timestamptz NOT NULL DEFAULT now(),
-    locked_until timestamptz,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    available_at timestamp with time zone DEFAULT now() NOT NULL,
+    locked_until timestamp with time zone,
     claim_token uuid,
-    published_at timestamptz,
-    last_error varchar(200),
-    created_at timestamptz NOT NULL DEFAULT now(),
-    deleted_at timestamptz
+    published_at timestamp with time zone,
+    last_error character varying(200),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT outbox_messages_pkey PRIMARY KEY (id)
 );
-CREATE INDEX IF NOT EXISTS idx_outbox_pending ON service_b.outbox_messages (available_at, created_at)
-    WHERE published_at IS NULL AND deleted_at IS NULL;
 
-ALTER TABLE service_b.deliveries ADD COLUMN IF NOT EXISTS replay_of_id uuid;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_initial_delivery_target ON service_b.deliveries(event_id, endpoint_id) WHERE replay_of_id IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_replay_source ON service_b.deliveries(replay_of_id) WHERE replay_of_id IS NOT NULL;
-ALTER TABLE service_b.deliveries DROP CONSTRAINT IF EXISTS deliveries_event_id_endpoint_id_key;
-ALTER TABLE service_b.delivery_attempts ADD COLUMN IF NOT EXISTS response_body text;
-ALTER TABLE service_b.delivery_attempts ADD COLUMN IF NOT EXISTS content_type varchar(256);
-ALTER TABLE service_b.delivery_attempts ADD COLUMN IF NOT EXISTS response_truncated boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_deliveries_event ON service_b.deliveries USING btree (event_id);
 
-ALTER TABLE service_b.delivery_attempts ADD COLUMN IF NOT EXISTS monitoring_exported_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_replay_source ON service_b.deliveries USING btree (replay_of_id) WHERE (replay_of_id IS NOT NULL);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_initial_delivery_target ON service_b.deliveries USING btree (event_id, endpoint_id) WHERE (replay_of_id IS NULL);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_pending ON service_b.outbox_messages USING btree (available_at, created_at) WHERE (published_at IS NULL);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_completion_message ON service_b.deliveries(completion_message_id) WHERE is_final;
+CREATE INDEX IF NOT EXISTS idx_final_delivery_cursor ON service_b.deliveries(finalized_at,id) WHERE is_final;

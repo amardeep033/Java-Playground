@@ -50,6 +50,7 @@ class EventIngestionServiceTest {
     }
     @Test void endpointSnapshotAndEventAreEnqueuedInTheSameServiceOperation() {
         when(keys.authenticate("key")).thenReturn(appId);
+        when(access.lockedApplication(appId)).thenReturn(new Application(UUID.randomUUID(),"Test"));
         var type = type();
         when(types.findByApplicationIdAndName(appId, "order.created")).thenReturn(Optional.of(type));
         var endpoint = new Endpoint(appId, "https://example.com/hook", null, Set.of(type));
@@ -69,6 +70,7 @@ class EventIngestionServiceTest {
     }
     @Test void unsignedLegacyEndpointIsRejectedBeforePersistence() {
         when(keys.authenticate("key")).thenReturn(appId);
+        when(access.lockedApplication(appId)).thenReturn(new Application(UUID.randomUUID(),"Test"));
         var type = type();
         when(types.findByApplicationIdAndName(appId, "order.created")).thenReturn(Optional.of(type));
         when(endpoints.findSubscribed(appId, typeId)).thenReturn(List.of(new Endpoint(appId, "https://example.com", null, Set.of(type))));

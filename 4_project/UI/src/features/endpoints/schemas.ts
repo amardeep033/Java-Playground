@@ -1,5 +1,6 @@
 import { z } from "zod";
 export const endpointSchema = z.object({
+  name: z.string().trim().min(1, "Enter an endpoint name.").max(120),
   url: z
     .string()
     .max(2048)

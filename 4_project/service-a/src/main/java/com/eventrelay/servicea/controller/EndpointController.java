@@ -22,8 +22,8 @@ public class EndpointController {
     }
 
     @GetMapping("")
-    public Responses.PageResult<Responses.WebhookEndpoint> list(@PathVariable UUID applicationId, @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.listEndpoints(applicationId, pageable);
+    public Responses.PageResult<Responses.WebhookEndpoint> list(@PathVariable UUID applicationId, @RequestParam(defaultValue="") String q, @RequestParam(defaultValue="") String status, @PageableDefault(sort = "createdAt") Pageable pageable) {
+        return service.listEndpoints(applicationId, q, status, pageable);
     }
     
     @GetMapping("/{endpointId}")
@@ -37,16 +37,19 @@ public class EndpointController {
         deletion.deleteEndpoint(applicationId, endpointId);
     }
 
-    @PutMapping("/{endpointId}/configuration")
-    public Responses.WebhookEndpoint configure(@PathVariable UUID applicationId, @PathVariable UUID endpointId,
-                                               @Valid @RequestBody EndpointConfiguration request) {
-        return service.configureEndpoint(applicationId, endpointId, request);
-    }
-
     @PostMapping("/{endpointId}/signing-secret/rotate")
     public org.springframework.http.ResponseEntity<Responses.IssuedEndpoint> rotateSigningSecret(
             @PathVariable UUID applicationId, @PathVariable UUID endpointId) {
         return org.springframework.http.ResponseEntity.status(HttpStatus.CREATED)
                 .cacheControl(org.springframework.http.CacheControl.noStore()).body(service.rotateSigningSecret(applicationId, endpointId));
+    }
+    @PutMapping("/{endpointId}")
+    public Responses.WebhookEndpoint update(@PathVariable UUID applicationId, @PathVariable UUID endpointId, @Valid @RequestBody UpdateEndpoint request) {
+        return service.updateEndpoint(applicationId, endpointId, request);
+    }
+
+    @PutMapping("/{endpointId}/admin")
+    public Responses.WebhookEndpoint admin(@PathVariable UUID applicationId,@PathVariable UUID endpointId,@Valid @RequestBody AdminEndpointUpdate request) {
+        return service.adminEndpointUpdate(applicationId,endpointId,request);
     }
 }

@@ -1,3 +1,8 @@
+import { ActivationToggle } from "@/components/shared/activation-toggle";
+import { ListFilters } from "@/components/shared/list-filters";
+import { ResourceSettings } from "@/components/shared/resource-settings";
+import { Pagination } from "@/components/shared/pagination";
+import { useDebounced } from "@/features/activity/shared";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,6 +26,7 @@ import { DeleteResource } from "@/components/shared/delete-resource";
 import { date } from "@/lib/utils";
 const schema = z.object({
   name: z.string().trim().min(1, "Give your application a name.").max(120),
+  clientId: z.string().uuid("Select a client."),
 });
 function CreateApplication({ onClose }: { onClose: () => void }) {
   const { user } = useWorkspace();
@@ -30,7 +36,7 @@ function CreateApplication({ onClose }: { onClose: () => void }) {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
+  } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: {clientId:user.clientId} });
   const mutation = useMutation({
     mutationFn: (value: z.infer<typeof schema>) =>
       applicationsApi.create(user.id, value),
@@ -75,55 +81,63 @@ function CreateApplication({ onClose }: { onClose: () => void }) {
 }
 export default function ApplicationsPage() {
   const queryClient = useQueryClient();
-  const { user } = useWorkspace();
+  const { user, canCreateApplications } = useWorkspace();
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const q = useDebounced(search);
+  const [status, setStatus] = useState("");
+
   const [create, setCreate] = useState(false);
   const query = useQuery({
-    queryKey: ["applications", user.id, page],
-    queryFn: () => applicationsApi.list(user.id, { page, size: 12 }),
+    queryKey: ["applications", user.id, page, q, status],
+    queryFn: () => applicationsApi.list(user.id, { page, size: 12, q, status }),
   });
   return (
     <>
       <PageHeader
         title="Applications"
-        description="The starting point for your webhook integrations."
-        action={
+        description="Manage your webhook integrations."
+        action={canCreateApplications &&
           <Button onClick={() => setCreate(true)}>
             <Plus size={16} />
             Create application
           </Button>
         }
       />
-      <div className="context-banner">
-        <span className="context-icon">
-          <Box size={20} />
-        </span>
-        <div>
-          <strong>A separate space for every integration.</strong>
-          <p>
-            Each application brings its own event types, destinations, and API
-            keys together.
-          </p>
-        </div>
-      </div>
-      <div className="section-heading">
-        <h2>
-          Your applications{" "}
-          {query.data && (
-            <span className="count-badge">{query.data.totalElements}</span>
-          )}
-        </h2>
-        <span>Organized. Connected. Ready to build.</span>
-      </div>
+      <ListFilters
+        label="applications"
+        status={status}
+        onStatus={(value) => {
+          setStatus(value);
+          setPage(0);
+        }}
+        options={[
+          { value: "ACTIVE", label: "Active" },
+          { value: "INACTIVE", label: "Inactive" },
+        ]}
+        search={search}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(0);
+        }}
+      />
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (
         <ErrorMessage error={query.error} retry={() => void query.refetch()} />
       ) : query.data.totalElements === 0 ? (
         <EmptyState
-          title="Your first connection starts here"
-          description="Create an application, define an event type, and add your first destination."
-          action={
+          title={
+            q || status
+              ? "No matching applications"
+              : canCreateApplications ? "Your first connection starts here" : "No applications assigned"
+          }
+          description={
+            q || status
+              ? "Try another name, description, or ID."
+              : canCreateApplications ? "Create an application, define an event type, and add your first destination." : "Your client administrator can grant you access to an application."
+          }
+          action={canCreateApplications &&
             <Button onClick={() => setCreate(true)}>
               <Plus size={16} />
               Create application
@@ -135,72 +149,29 @@ export default function ApplicationsPage() {
           <div className="application-grid">
             {query.data.items.map((app) => (
               <article className="application-card" key={app.id}>
-                <div className="app-card-top">
-                  <span className="app-icon">
-                    <Box size={22} />
-                  </span>
-                  <DeleteResource
-                    name={app.name}
-                    description="This will remove the application and all of its endpoints, event types, and keys from the workspace. Records are retained for history."
-                    remove={() => applicationsApi.remove(user.id, app.id)}
-                    onDeleted={() => {
-                      setPage(0);
-                      void queryClient.invalidateQueries({
-                        queryKey: ["applications", user.id],
-                      });
-                    }}
-                  />
-                </div>
-                <h3>
-                  <Link to={`/users/${user.id}/apps/${app.id}/overview`}>
-                    {app.name}
-                    <ArrowRight size={18} />
-                  </Link>
-                </h3>
-                <div className="app-id">
-                  <code>{app.id.slice(0, 18)}…</code>
-                  <CopyButton value={app.id} />
-                </div>
-                <div className="app-card-footer">
-                  <span>Created {date(app.createdAt)}</span>
-                  <Link to={`/users/${user.id}/apps/${app.id}/overview`}>
-                    Open application
-                    <ArrowRight size={14} />
-                  </Link>
-                </div>
+                <span className="app-icon"><Box size={22} /></span>
+                <div className="application-summary"><h3><Link to={`/users/${user.id}/apps/${app.id}/overview`}>{app.name}</Link></h3>{app.description && <p className="muted">{app.description}</p>}</div>
+                <div className="app-id"><code>{app.id.slice(0,18)}…</code><CopyButton value={app.id} /></div>
+                <span className="app-created">Created {date(app.createdAt)}</span>
+                {app.clientRole==="ADMIN" && <ResourceSettings name={app.name} metadata={{title:"Edit application",name:app.name,description:app.description,editName:true,editDescription:true,
+                  save:body=>applicationsApi.update(user.id,app.id,{name:body.name!,description:body.description}),
+                  onSaved:()=>{void queryClient.invalidateQueries({queryKey:["applications",user.id]});void queryClient.invalidateQueries({queryKey:["application",user.id,app.id]});}}}>
+                  <ActivationToggle canChange={app.clientRole==="ADMIN"} active={app.active} name={app.name} save={active=>applicationsApi.update(user.id,app.id,{active})} />
+                  {(app.clientRole==="ADMIN") && <div className="danger-zone"><h3>Delete application</h3><p>Remove this application from active use. History is retained.</p><DeleteResource name={app.name} description="This removes the application, endpoints, event types and keys from the workspace. History is retained; this cannot be undone in the UI." remove={()=>applicationsApi.remove(user.id,app.id)} onDeleted={()=>{setPage(0);void queryClient.invalidateQueries();}} /></div>}
+                </ResourceSettings>}
               </article>
             ))}
           </div>
-          <div className="pagination">
-            <span>
-              Page {page + 1} of {query.data.totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page + 1 >= query.data.totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
         </>
       )}
+      {query.data && <Pagination page={page} totalPages={query.data.totalPages} totalElements={query.data.totalElements} onPage={setPage} />}
       <Dialog open={create} onOpenChange={setCreate}>
         <DialogContent>
           <DialogHeader
             title="Create application"
             description="Give your webhook integration a space of its own."
           />
-          {create && <CreateApplication onClose={() => setCreate(false)} />}
+          {create && canCreateApplications && <CreateApplication onClose={() => setCreate(false)} />}
         </DialogContent>
       </Dialog>
     </>

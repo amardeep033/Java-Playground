@@ -1,7 +1,6 @@
 package com.eventrelay.serviceb.delivery;
 
 import java.time.Instant;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,11 +41,11 @@ public class DeliveryService {
         String status = result.succeeded() ? "SUCCEEDED" : result.retryable() && attempt < snapshot.maxAttempts() ? "RETRY_SCHEDULED" : "DEAD";
         Instant nextAttempt = status.equals("RETRY_SCHEDULED") ? Instant.now().plusMillis(retryDelay) : null;
         store.result(delivery, attempt, status, result, nextAttempt);
-        UUID updateId = UUID.randomUUID();
-        var update = new DeliveryStatusMessage(1, updateId, delivery.id(), snapshot.eventId(), snapshot.applicationId(), snapshot.endpointId(),
-                status, attempt, delivery.sequence() + 1, result.httpStatus(), result.error(), nextAttempt, result.completedAt(),
-                new DeliveryStatusMessage.Attempt(attempt, result.httpStatus(), result.error(), result.startedAt(), result.completedAt(), result.responseBody(), result.contentType(), result.responseTruncated()));
-        outbox.enqueue(updateId, delivery.id(), RabbitMqConfig.STATUS_EXCHANGE, "delivery.updated", update);
+        if (!status.equals("RETRY_SCHEDULED")) {
+            var update=store.completion(delivery.id());
+            update.validate();
+            outbox.enqueue(update.messageId(),delivery.id(),RabbitMqConfig.STATUS_EXCHANGE,"delivery.completed",update);
+        }
         if (status.equals("RETRY_SCHEDULED")) {
             var retry = snapshot.forAttempt(attempt + 1);
             outbox.enqueue(retry.messageId(), delivery.id(), RabbitMqConfig.RETRY_EXCHANGE, "delivery.retry", retry);

@@ -23,8 +23,8 @@ public class EventTypeController {
     }
 
     @GetMapping("")
-    public Responses.PageResult<Responses.Event> list(@PathVariable UUID applicationId, @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.listEventTypes(applicationId, pageable);
+    public Responses.PageResult<Responses.Event> list(@PathVariable UUID applicationId, @RequestParam(defaultValue="") String q, @RequestParam(defaultValue="") String status, @PageableDefault(sort = "createdAt") Pageable pageable) {
+        return service.listEventTypes(applicationId, q, status, pageable);
     }
     
     @GetMapping("/{eventTypeId}")
@@ -36,5 +36,14 @@ public class EventTypeController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID applicationId, @PathVariable UUID eventTypeId) {
         deletion.deleteEventType(applicationId, eventTypeId);
+    }
+    @PutMapping("/{eventTypeId}")
+    public Responses.Event update(@PathVariable UUID applicationId, @PathVariable UUID eventTypeId, @Valid @RequestBody UpdateDescription request) {
+        return service.updateEventType(applicationId, eventTypeId, request);
+    }
+
+    @PutMapping("/{eventTypeId}/activation")
+    public Responses.Event activation(@PathVariable UUID applicationId,@PathVariable UUID eventTypeId,@Valid @RequestBody Activation request) {
+        return service.setEventTypeActive(applicationId,eventTypeId,request.active());
     }
 }

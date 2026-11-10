@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures";
 
-test("login history, HttpOnly session persistence, and sign out", async ({
+test("login history, HttpOnly cookie persistence, and sign out", async ({
   page,
   request,
   context,
@@ -15,9 +15,9 @@ test("login history, HttpOnly session persistence, and sign out", async ({
   ).json()) as { id: string };
   await page.goto(`/users/${user.id}/settings`);
   await expect(
-    page.getByRole("heading", { name: "Session & access", exact: true }),
+    page.getByRole("heading", { name: "Account access", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("USER", { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("ADMIN",{exact:true})).toBeVisible();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByLabel("Email address").fill(email);
@@ -41,23 +41,20 @@ test("login history, HttpOnly session persistence, and sign out", async ({
   await expect(
     page.getByRole("heading", { name: "Applications", exact: true }),
   ).toBeVisible();
-  const session = (await context.cookies()).find(
-    (cookie) => cookie.name === "ER_SESSION",
-  );
-  expect(session?.httpOnly).toBe(true);
-  expect(session?.sameSite).toBe("Lax");
-  expect(await page.evaluate(() => document.cookie)).not.toContain(
-    "ER_SESSION",
-  );
+  const cookie = (await context.cookies()).find((c) => c.name === "ER_ACCESS");
+  expect(cookie?.httpOnly).toBe(true);
+  expect(cookie?.sameSite).toBe("Lax");
+  expect(await page.evaluate(() => document.cookie)).not.toContain("ER_ACCESS");
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
-    session!.value,
+    cookie!.value,
   );
   expect(
     await page.evaluate(() => JSON.stringify(sessionStorage)),
-  ).not.toContain(session!.value);
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Profile & security", exact: true })
+  ).not.toContain(cookie!.value);
+  const outgoing = page.waitForRequest((r) => r.url().endsWith("/auth/me"));
+  await page.reload();
+  expect((await outgoing).headers().authorization).toBeUndefined();
+  await page.getByRole("button", { name: "Profile & security", exact: true })
     .click();
   await expect(
     page.getByRole("cell", { name: "Wrong email or password", exact: true }),
@@ -69,9 +66,7 @@ test("login history, HttpOnly session persistence, and sign out", async ({
     path: testInfo.outputPath("profile-security.png"),
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Sign out all sessions", exact: true })
-    .click();
+  await page.getByRole("button",{name:"Sign out",exact:true}).click();
   await expect(
     page.getByRole("heading", { name: "Create your workspace", exact: true }),
   ).toBeVisible();
@@ -79,7 +74,7 @@ test("login history, HttpOnly session persistence, and sign out", async ({
   await expect(
     page.getByRole("heading", { name: "Create your workspace", exact: true }),
   ).toBeVisible();
-  // Revocation in another client must also clear a dashboard with cached session data.
+  // Logout in another client clears cached dashboard data on the next request.
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -90,14 +85,12 @@ test("login history, HttpOnly session persistence, and sign out", async ({
   await expect(
     page.getByRole("heading", { name: "Applications", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Profile & security", exact: true })
+  await page.getByRole("button", { name: "Profile & security", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Recent login attempts", exact: true }),
   ).toBeVisible();
-  await request.post(`${api}/auth/logout-all`);
+  await request.post(`${api}/auth/logout`);
   await page
     .getByRole("button", { name: "Refresh history", exact: true })
     .click();

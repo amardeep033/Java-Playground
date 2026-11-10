@@ -25,8 +25,8 @@ public class ApiKeyController {
 
     @GetMapping
     public Responses.PageResult<Responses.ApiKeyDetails> list(@PathVariable UUID applicationId,
-            @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.list(applicationId, pageable);
+            @RequestParam(defaultValue="") String q, @RequestParam(defaultValue="") String status, @PageableDefault(sort = "createdAt") Pageable pageable) {
+        return service.list(applicationId, q, status, pageable);
     }
 
     @GetMapping("/{keyId}")
@@ -44,5 +44,9 @@ public class ApiKeyController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void revoke(@PathVariable UUID applicationId, @PathVariable UUID keyId) {
         service.revoke(applicationId, keyId);
+    }
+    @PutMapping("/{keyId}")
+    public Responses.ApiKeyDetails update(@PathVariable UUID applicationId, @PathVariable UUID keyId, @Valid @RequestBody com.eventrelay.servicea.dto.Requests.UpdateName request) {
+        return service.update(applicationId, keyId, request);
     }
 }

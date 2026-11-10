@@ -3,9 +3,11 @@ import java.util.*;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import com.eventrelay.servicea.entity.Endpoint;
-public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
+public interface EndpointRepository extends JpaRepository<Endpoint, UUID>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Endpoint> {
     @org.springframework.data.jpa.repository.Query("select distinct e from Endpoint e join e.eventTypes t where e.applicationId = :appId and t.id = :eventTypeId and e.enabled = true order by e.id")
     List<Endpoint> findSubscribed(UUID appId, UUID eventTypeId);
+    @org.springframework.data.jpa.repository.Query("select distinct e.id from Endpoint e join e.eventTypes t where e.applicationId=:appId and t.id=:eventTypeId and e.enabled=false order by e.id")
+    List<UUID> findInactiveSubscribed(UUID appId,UUID eventTypeId);
     Page<Endpoint> findByApplicationId(UUID applicationId, Pageable pageable);
     Optional<Endpoint> findByIdAndApplicationId(UUID id, UUID applicationId);
 

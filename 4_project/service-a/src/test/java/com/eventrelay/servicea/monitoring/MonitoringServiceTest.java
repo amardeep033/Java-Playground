@@ -53,7 +53,7 @@ class MonitoringServiceTest {
         assertEquals("current-encrypted",command.getValue().signingSecretEncrypted());assertEquals(12000,command.getValue().timeoutMs());
         assertEquals("{\"original\":true}",command.getValue().body());
         verify(events).delivery(receipt.id(),event,app,endpointId,endpoint.getUrl(),source);
-        verify(store).replayRequest(eq(app),eq("request"),eq(source),eq(receipt.id()),any());
+        verify(store).replayRequest(eq(app),eq("request"),eq(receipt.id()),any());
     }
     @Test void anotherAppsKeyCannotReadMonitoring(){
         when(keys.authenticate("key")).thenReturn(UUID.randomUUID());
@@ -72,6 +72,6 @@ class MonitoringServiceTest {
         verifyNoInteractions(store,outbox);
     }
     private MonitoringApi.DeliverySummary delivery(boolean replay,String reason){
-        return new MonitoringApi.DeliverySummary(source,event,endpointId,"order.created","https://example.com/hook","DEAD",2,503,"HTTP 503",null,Instant.now(),Instant.now(),null,null,replay,reason);
+        return new MonitoringApi.DeliverySummary(source,event,endpointId,"order.created","https://example.com/hook","DEAD",2,503,"HTTP 503",Instant.now(),Instant.now(),null,null,replay,reason);
     }
 }

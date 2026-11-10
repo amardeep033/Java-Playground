@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.*;
 public class EventController {
     private final EventIngestionService service;
     public EventController(EventIngestionService service) { this.service = service; }
+    // One POST path for both callers: customer servers send X-API-Key;
+    // the dashboard omits it and sends its HttpOnly JWT cookie plus a CSRF header.
+    // Both use this path. JWT verification is stateless; API-key revocation does
+    // not block an authorized dashboard user, and invalid keys never fall back to JWT.
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     public EventApi.Accepted receive(@PathVariable UUID applicationId,

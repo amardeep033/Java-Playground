@@ -23,7 +23,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     const expired = () => {
       if (window.location.pathname === "/") return;
       queryClient.clear();
-      window.location.assign("/");
+      window.location.assign(
+        "/",
+      );
     };
     window.addEventListener("session-expired", expired);
     return () => window.removeEventListener("session-expired", expired);

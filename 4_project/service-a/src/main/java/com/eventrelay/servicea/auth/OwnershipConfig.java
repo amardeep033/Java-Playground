@@ -3,34 +3,39 @@ package com.eventrelay.servicea.auth;
 import java.util.*;
 import jakarta.servlet.http.*;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.servlet.*;
 import org.springframework.web.servlet.config.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import com.eventrelay.servicea.workspace.WorkspaceAccess;
 
 @Configuration
 public class OwnershipConfig implements WebMvcConfigurer {
-    private final JdbcTemplate db;
-    public OwnershipConfig(JdbcTemplate db) { this.db=db; }
+    private final WorkspaceAccess access;
+    public OwnershipConfig(WorkspaceAccess access) { this.access=access; }
     @Override public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new HandlerInterceptor() {
             @Override public boolean preHandle(HttpServletRequest request,HttpServletResponse response,Object handler) {
-                if(SecurityConfig.keyRequest(request)) return true; // App API authorization remains inside ingestion/monitoring services.
-                SessionUser user=SessionUser.current();
-                if(user==null) return true; // Public routes; all other routes require authentication in the filter chain.
+                if(SecurityConfig.keyRequest(request)) return true; // Explicit keys are checked inside ingestion/monitoring.
+                JwtUser user=JwtUser.current();if(user==null) return true;
                 var variables=(Map<?,?>)request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
                 if(variables==null) return true;
-                if(variables.get("userId") instanceof String id && !id.equals(user.id().toString())) {
-                    if(!user.admin() || request.getRequestURI().endsWith("/password")) deny();
+                String method=request.getMethod(),path=request.getRequestURI();
+                boolean read=method.equals("GET")||method.equals("HEAD");
+                if(variables.get("userId") instanceof String id && variables.get("clientId")==null) {
+                    UUID target=UUID.fromString(id);
+                    if(variables.get("applicationId") instanceof String appId) {
+                        // The account prefix is navigation context; live client membership and app mappings decide access.
+                        access.member(UUID.fromString(appId));
+                    } else access.account(target,false);
                 }
-                if(variables.get("applicationId") instanceof String id && !user.admin()) {
-                    Boolean owns=db.queryForObject("SELECT EXISTS(SELECT 1 FROM service_a.applications WHERE id=? AND user_id=? AND deleted_at IS NULL)",Boolean.class,UUID.fromString(id),user.id());
-                    if(!Boolean.TRUE.equals(owns)) deny();
+                if(variables.get("clientId") instanceof String id) {
+                    access.clientRole(UUID.fromString(id));
+                }
+                if(variables.get("applicationId") instanceof String id) {
+                    UUID app=UUID.fromString(id);access.member(app);
+                    if(!read && (path.endsWith("/admin")||path.endsWith("/activation")||path.endsWith("/url")||path.endsWith("/subscriptions")||method.equals("DELETE"))) access.admin(app);
                 }
                 return true;
             }
         }).addPathPatterns("/api/v1/**");
     }
-    private static void deny() { throw new ResponseStatusException(HttpStatus.FORBIDDEN,"You do not have access to this resource"); }
 }

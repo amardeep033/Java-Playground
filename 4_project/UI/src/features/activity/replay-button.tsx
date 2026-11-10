@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useTracking } from "./tracking-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { RotateCcw, ArrowUpRight } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/shared/feedback";
@@ -9,28 +9,22 @@ import { useWorkspace } from "@/app/layouts/workspace-layout";
 import { activityApi } from "./api";
 import type { Delivery } from "./types";
 export function ReplayButton({ delivery }: { delivery: Delivery }) {
-  const { user, app } = useWorkspace();
-  const navigate = useNavigate();
+  const { app } = useWorkspace();
+  const tracking=useTracking();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [requestKey, setRequestKey] = useState("");
-  const root = `/users/${user.id}/apps/${app!.id}`;
   const mutation = useMutation({
     mutationFn: () => activityApi.replay(app!.id, delivery.id, requestKey),
     onSuccess: (receipt) => {
       void queryClient.invalidateQueries({ queryKey: ["activity", app!.id] });
       setOpen(false);
-      navigate(`${root}/deliveries/${receipt.id}`);
+      tracking.jump({kind:"delivery",id:receipt.id});
     },
   });
   if (delivery.replayId)
     return (
-      <Button variant="outline" size="sm" asChild>
-        <Link to={`${root}/deliveries/${delivery.replayId}`}>
-          View replay
-          <ArrowUpRight size={13} />
-        </Link>
-      </Button>
+      <Button variant="outline" size="sm" onClick={()=>tracking.jump({kind:"delivery",id:delivery.replayId!})}>View replay</Button>
     );
   return (
     <>

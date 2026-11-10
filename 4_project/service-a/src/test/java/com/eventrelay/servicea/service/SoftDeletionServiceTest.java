@@ -23,7 +23,7 @@ class SoftDeletionServiceTest {
     UUID userId = UUID.randomUUID();
     UUID appId = UUID.randomUUID();
 
-    @BeforeEach void setUp() { service = new SoftDeletionService(access, applications, events, endpoints, keys); }
+    @BeforeEach void setUp() { service = new SoftDeletionService(access, applications, events, endpoints, keys,mock(org.springframework.jdbc.core.JdbcTemplate.class)); }
 
     @Test void applicationDeletionRetainsRowsAndMarksAllChildren() {
         var app = new Application(userId, "Shop");
@@ -34,7 +34,7 @@ class SoftDeletionServiceTest {
         verify(endpoints).softDeleteByApplicationId(eq(appId), any());
         verify(events).softDeleteByApplicationId(eq(appId), any());
         verify(keys).softDeleteByApplicationId(eq(appId), any());
-        verify(applications, never()).delete(any());
+        verify(applications, never()).delete(any(Application.class));
     }
 
     @Test void anotherUsersApplicationIsNotDeleted() {
@@ -52,7 +52,7 @@ class SoftDeletionServiceTest {
         when(events.findByIdAndApplicationId(id, appId)).thenReturn(Optional.of(event));
         service.deleteEventType(appId, id);
         assertNotNull(event.getDeletedAt());
-        verify(events, never()).delete(any());
+        verify(events, never()).delete(any(EventType.class));
         verifyNoInteractions(endpoints);
     }
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 export const registrationSchema = z.object({
+  companyName: z.string().trim().min(1, "Enter your company name.").max(120),
   name: z.string().trim().min(1, "Enter your name.").max(120),
   email: z.string().email("Enter a valid email address.").max(320),
   password: z.string().min(12, "Use at least 12 characters.").max(128),

@@ -1,65 +1,55 @@
 # Event Relay UI
 
-React 19 + TypeScript + Vite. Requires Node.js 22.12+.
+React 19, TypeScript and Vite. Requires Node 22.12+.
 
-If your terminal uses Node 18 (`node --version`), run from `UI/`:
+From the project root:
 
 ```bash
-npx --yes --package=node@22 --call 'npm run dev'
+./run.sh
+./run1.sh
+./run2.sh
+./run0.sh
 ```
 
-This uses Node 22 for the command without changing your system Node version. The same wrapper works for other scripts, e.g. `npx --yes --package=node@22 --call 'npm run build'`.
+Open http://localhost:5173. Company signup requires your name, company name, email and password, and creates the first ADMIN. Existing company members use Sign in on the same page; there is no public normal-user registration or developer/admin-console login.
+
+- ADMIN: all company applications; create accounts as ADMIN/USER; edit account names/emails/roles; reset passwords; map users to apps. Keep at least one ADMIN.
+- USER: mapped applications only. No company user administration, app creation, or app metadata editing.
+- Profile: own name/password, deletion with last-admin protection, recent login attempts.
+- Monitoring: Incoming requests → Events → Deliveries → Dead letters. Configuration: API keys, Event types, Endpoints. Both groups collapse.
+- ADMIN-only Workspace: Users & access (including app mappings), Applications, Audit logs. One audit screen filters current app + company, current app only, company only, or all company apps; search/resource/action filters run on the backend. No credential values are recorded.
+- Profile & security opens as two overlay cards from the bottom profile button. User editors expose fields, mappings and password reset in one layout. List names/IDs open details; no arrow-only actions. Resource management stays behind pencils; deletion requires red confirmation. App context persists; pagination stays at the bottom.
+- Access JWT: 15 minutes by default. Opaque refresh cookie: fixed maximum 30 days, rotates on use; reuse/logout revokes its family. Password changes revoke all account refresh families. Access JWT verification remains stateless; business authorization checks live company permissions.
+- JWT/refresh/CSRF cookies are HttpOnly; writes require a masked CSRF header. Explicit API-key event/monitoring requests use separate key checks. Credentials never enter browser storage. Only the selected app ID and theme preference are stored.
+- Vite proxies `/api` to Service A on 8081. Service B has no public HTTP APIs.
 
 ```bash
-# Terminal 1: from service-a/
-mvn spring-boot:run
-
-# Terminal 2: from UI/
-npm ci
-npm run dev
-```
-
-Open http://localhost:5173. Register an account or sign in with your registered email and password. Existing accounts continue to work.
-
-- Applications, event types, endpoint subscriptions, API keys (create/rotate/revoke), profile and password changes.
-- Soft-delete users/apps/event types/endpoints with confirmation; deleting a parent includes its children. API-key revocations retain history.
-- Endpoint configuration: enabled status, rate limit, concurrency, timeout, maximum attempts. Service B applies these settings to newly queued deliveries.
-- Signing secrets are generated on endpoint creation, can be rotated, and appear once. Metadata never reveals a secret.
-- Events: send JSON payloads, browse/search/filter received events, and inspect event delivery history.
-- Deliveries: live status, request inspection, attempt timelines, bounded response previews, and failed-delivery replay with linked history.
-- Dead letters: persisted failed deliveries; optionally include already replayed failures.
-- Dashboard activity uses the HttpOnly JWT session; refreshing stays signed in. API keys are for external event clients.
-- USER can access owned resources; ADMIN can access all application workspaces. Session lifetime: 8 hours; sign out/current or all sessions in the UI.
-- Vite proxies `/api` to `http://localhost:8081`; no backend CORS changes needed. Override with `API_PROXY_TARGET`.
-- One-time key secrets stay in local component memory. JWT is in an HttpOnly cookie; no API key or JWT in local/session storage.
-- Profile & security shows recent login attempts. Five failures within 15 minutes lock login for 15 minutes. Password change signs out all sessions.
-- Stack and dependencies follow `../mindmap/frontend`; charts and shared client stores are omitted because current features do not require them.
-
-```bash
+cd UI
 npm run build
 npm test
-# With Service A running, and Chrome installed:
-npm run test:e2e
 ```
 
-E2E tests use UI port 5174 so a development server on 5173 can keep running. They register a disposable user. To identify the exact email, set `E2E_RUN_ID` before running; it becomes `ui-e2e-<E2E_RUN_ID>@example.com`. Test data persists unless removed manually.
-
-Build output: `dist/`. For static hosting, serve `index.html` for client routes and reverse-proxy `/api/` to Service A. `VITE_API_BASE_URL` optionally overrides the API URL at build time; cross-origin deployment requires matching backend CORS configuration.
-
-`PLAYWRIGHT_CHROME_PATH` overrides the browser executable (default `/usr/bin/google-chrome`).
-
-From the project root: `./run0.sh` restarts this UI; `./run0.sh --stop` stops it. Use `UI_PORT` for a custom port.
-
-Full-stack verification (disposable PostgreSQL database, RabbitMQ container and local receiver; existing services/data are untouched):
+Full-stack checks use disposable PostgreSQL and RabbitMQ; build both service jars first:
 
 ```bash
-# Build both services from the project root first:
-mvn -f service-a/pom.xml package
-mvn -f service_b/pom.xml package
-# With Node 22+, Docker, psql and local PostgreSQL available:
 python3 UI/e2e/run-local.py
 ```
 
-The full-stack runner covers sending, status/attempt projection, replay idempotency, history synchronization, response bounds, pagination, and the browser workflow. It removes its own test database and broker afterward.
+API curls and table examples: [Service A APIs](../service-a/api.md), [Service A tables](../service-a/tables.md).
 
-Authentication configuration (Service A): AUTH_COOKIE_SECURE=true behind HTTPS. Keep AUTH_KEY_FILE persistent (local default: service-a/.local/auth.key), or set AUTH_JWT_KEY to a Base64-encoded 32-byte key. CSRF is handled automatically by the UI. Role bootstrap and curl examples: ../service-a/tables.md and ../service-a/api.md.
+Delivery monitoring reads Service A projections: pending includes Service B’s internal retries. Final SUCCEEDED/DEAD completions include all attempts; A repairs missed completions every 60 seconds through an authenticated REST cursor feed. No direct UI access to Service B.
+
+Users & access: paginated users include applicationIds and the complete company app catalogue. Create/edit use a searchable multi-select dropdown; no separate user-app list request or app-mapping pagination.
+
+Application activation uses its metadata update PUT. Event types/endpoints keep separate activation APIs because metadata and activation have different permissions. Activation preserves metadata; backend permissions and audit rules remain enforced.
+
+
+Related records use a dropdown to open the destination list with a filter/selection. Detail cards load only their selected record. Audit logs use one company-admin API with server-side column filters and time sorting.
+
+Endpoint destination, configuration and event mappings update in place with audit entries. Previously accepted deliveries retain their original dispatch snapshot, including retry settings and signing credentials.
+
+List filters live in column headers and close on outside click/Escape. Status selections filter on the backend before pagination. Editors use horizontal labels, header activation switches, and right-aligned actions; delete effects are described in confirmation dialogs. Event subscriptions use a searchable, paginated multi-select.
+
+Endpoint writes use two PUT routes: common metadata/delivery configuration, and ADMIN-only activation/destination/subscriptions. Event-type pickers load more options on scroll, with search and no pagination buttons. API-key status is in the editor header; revocation remains irreversible and requires confirmation.
+
+For a focused UI rerun after backend contracts pass: `python3 UI/e2e/run-local.py --browser-only polish.spec.ts` (from the project root, Node 22+ on PATH). It still uses disposable services/data.

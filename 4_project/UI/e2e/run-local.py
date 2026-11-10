@@ -1,10 +1,12 @@
 """Isolated full-stack verification. Requires Node 22+, Java 21, Maven, Docker, psql."""
 from concurrent.futures import ThreadPoolExecutor
-import json
 import http.cookiejar
+import json
 import importlib.util
 import sys
 sys.dont_write_bytecode = True
+BROWSER_ONLY = "--browser-only" in sys.argv
+if BROWSER_ONLY: sys.argv.remove("--browser-only")
 import os
 from pathlib import Path
 import socket
@@ -73,11 +75,12 @@ cookie_jar = http.cookiejar.CookieJar()
 browser = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
 def api(method, path, body=None, expected=200, headers=None, anonymous=False):
     global checks
-    use_key = bool((headers or {}).get('X-API-Key'))
+    if method=='POST' and path=='/users' and body is not None: body={'companyName':'Test company',**body}
     extra = dict(headers or {})
-    if method not in ('GET','HEAD') and not use_key:
-        token = api('GET', '/auth/csrf')['token']
-        extra['X-XSRF-TOKEN'] = token
+    use_key = 'X-API-Key' in extra
+    if method not in ('GET','HEAD') and not use_key and not anonymous:
+        csrf = api('GET','/auth/csrf')
+        extra[csrf['headerName']] = csrf['token']
     request = urllib.request.Request(base + path, method=method, data=None if body is None else json.dumps(body).encode(), headers={'Content-Type': 'application/json', **extra})
     try: response = (urllib.request.urlopen if use_key or anonymous else browser.open)(request, timeout=10)
     except urllib.error.HTTPError as error: response = error
@@ -101,7 +104,7 @@ def start(folder, artifact, port):
     logfiles.append(log)
     process = subprocess.Popen(['java', '-jar', str(ROOT / folder / 'target' / (artifact + '-0.0.1-SNAPSHOT.jar')),
             f'--server.port={port}', f'--spring.rabbitmq.port={broker_port}', '--app.retry-delay-ms=300', '--app.outbox.poll-delay-ms=100',
-            f'--spring.datasource.url=jdbc:postgresql://localhost:5432/{DATABASE}', f'--app.signing.key-file={ARTIFACTS}/signing.key', f'--app.auth.key-file={ARTIFACTS}/auth.key'],
+            f'--spring.datasource.url=jdbc:postgresql://localhost:5432/{DATABASE}', f'--app.signing.key-file={ARTIFACTS}/signing.key', f'--app.auth.key-file={ARTIFACTS}/auth.key',f'--app.internal.key-file={ARTIFACTS}/internal.key',f'--app.reconciliation.service-b-url=http://127.0.0.1:{port_b}','--app.reconciliation.poll-delay-ms=1000','--app.reconciliation.initial-delay-ms=1000'],
             cwd=ROOT/folder, stdout=log, stderr=subprocess.STDOUT)
     processes.append(process)
     for _ in range(180):
@@ -134,10 +137,17 @@ def verify_backend():
     other = api('POST', f'/users/{user["id"]}/applications', {'name': 'Other app'}, 201)['id']
     api('GET', f'/applications/{other}/deliveries', expected=403, headers=headers)
     api('POST', prefix+'/deliveries/'+delivery+'/replay', expected=400, headers=headers)
-    api('PUT', prefix+'/endpoints/'+endpoint['id']+'/configuration', dict(endpoint['configuration'], enabled=False))
+    api('PUT', prefix+'/endpoints/'+endpoint['id']+'/admin', {'active':False})
     assert not api('GET', prefix+'/deliveries/'+delivery, headers=headers)['delivery']['canReplay']
     api('POST', prefix+'/deliveries/'+delivery+'/replay', expected=409, headers={**headers, 'Idempotency-Key': 'disabled'})
-    api('PUT', prefix+'/endpoints/'+endpoint['id']+'/configuration', endpoint['configuration'])
+    api('PUT', prefix+'/endpoints/'+endpoint['id']+'/admin', {'active':True})
+    # App/event-type pauses also disable new replays, without hiding history.
+    for resource in [f'/users/{user["id"]}/applications/{app}', prefix+'/event-types/'+kind]:
+        api('PUT',resource if resource.startswith('/users/') else resource+'/activation',{'active':False})
+        details=api('GET',prefix+'/deliveries/'+delivery,headers=headers)
+        assert not details['delivery']['canReplay']
+        api('POST',prefix+'/deliveries/'+delivery+'/replay',expected=409,headers={**headers,'Idempotency-Key':'inactive-'+resource.split('/')[-1]})
+        api('PUT',resource if resource.startswith('/users/') else resource+'/activation',{'active':True})
     with lock: statuses['/api-check'] = 200
     def replay(_): return api('POST', prefix+'/deliveries/'+delivery+'/replay', expected=202, headers={**headers, 'Idempotency-Key': 'replay-once'})
     with ThreadPoolExecutor(max_workers=4) as executor: receipts = list(executor.map(replay, range(4)))
@@ -161,13 +171,11 @@ def verify_backend():
     assert len(first['items']) == 20 and len(second['items']) == 3 and first['totalElements'] == 23
     assert api('GET', prefix+'/events?status=NO_SUBSCRIBERS', headers=headers)['totalElements'] == 22
     assert api('GET', prefix+'/events?q=monitoring.empty', headers=headers)['totalElements'] == 22
-    # Simulate an existing pre-upgrade attempt: recover metadata without sending another webhook.
-    before = len(calls)
-    sql(f"DELETE FROM service_a.delivery_attempt_projections WHERE delivery_id='{replay_id}'")
-    sql(f"UPDATE service_b.delivery_attempts SET monitoring_exported_at=NULL,response_body=NULL,content_type=NULL WHERE delivery_id='{replay_id}'")
-    recovered = wait_for(lambda: api('GET', prefix+'/deliveries/'+replay_id, headers=headers), lambda data: len(data['attempts']) == 1)
-    assert recovered['attempts'][0]['httpStatus'] == 200 and recovered['attempts'][0]['responseBody'] is None
-    assert len(calls) == before
+    # Simulate a missed final event before the repair cursor passes this delivery.
+    before=len(calls)
+    sql(f"DELETE FROM service_a.status_inbox WHERE delivery_id='{replay_id}'; DELETE FROM service_a.delivery_attempt_projections WHERE delivery_id='{replay_id}'; UPDATE service_a.delivery_projections SET status='PENDING',last_sequence=0,attempt_count=0 WHERE id='{replay_id}'; UPDATE service_a.reconciliation_cursors SET finalized_at='1970-01-01T00:00:00Z',delivery_id='00000000-0000-0000-0000-000000000000'")
+    recovered=wait_for(lambda:api('GET',prefix+'/deliveries/'+replay_id,headers=headers),lambda data:data['delivery']['status']=='SUCCEEDED' and len(data['attempts'])==1)
+    assert recovered['attempts'][0]['httpStatus']==200 and len(calls)==before
     for path, timeout in [('/large', 2000), ('/stream', 200)]:
         name = 'monitoring.'+path[1:]
         kind = api('POST', prefix+'/event-types', {'name': name}, 201)['id']
@@ -192,16 +200,33 @@ try:
             time.sleep(.5)
     else: raise RuntimeError('Test RabbitMQ did not become ready; see '+str(ARTIFACTS))
     # Packages must be built before running this harness; README provides commands.
+    sql((ROOT/'service-a/src/main/resources/db/schema.sql').read_text())
     start('service-a', 'service-a', port_a); start('service_b', 'service-b', port_b)
-    spec = importlib.util.spec_from_file_location('auth_checks', ROOT/'UI/e2e/auth-checks.py')
-    auth_checks = importlib.util.module_from_spec(spec); spec.loader.exec_module(auth_checks)
-    auth_checks.verify_auth(base, sql)
-    verify_backend()
+    if not BROWSER_ONLY:
+        spec=importlib.util.spec_from_file_location('company_checks',ROOT/'UI/e2e/company-checks.py')
+        company=importlib.util.module_from_spec(spec);spec.loader.exec_module(company)
+        company.verify_company(base,sql,receiver_url)
+        verify_backend()
+        metadata_spec=importlib.util.spec_from_file_location('metadata_checks',ROOT/'UI/e2e/metadata-checks.py')
+        metadata_checks=importlib.util.module_from_spec(metadata_spec);metadata_spec.loader.exec_module(metadata_checks)
+        metadata_checks.verify_metadata(api,receiver_url)
+        activation_spec=importlib.util.spec_from_file_location('activation_checks',ROOT/'UI/e2e/activation-checks.py')
+        activation_checks=importlib.util.module_from_spec(activation_spec);activation_spec.loader.exec_module(activation_checks)
+        activation_checks.verify_activation(api,receiver_url)
+        snapshot_spec=importlib.util.spec_from_file_location('snapshot_checks',ROOT/'UI/e2e/snapshot-checks.py')
+        snapshots=importlib.util.module_from_spec(snapshot_spec);snapshot_spec.loader.exec_module(snapshots)
+        snapshots.verify_snapshots(api,sql,wait_for,receiver_url,calls)
+        ingress_spec=importlib.util.spec_from_file_location('ingress_checks',ROOT/'UI/e2e/ingress-checks.py')
+        ingress_checks=importlib.util.module_from_spec(ingress_spec);ingress_spec.loader.exec_module(ingress_checks)
+        ingress_checks.verify_ingress(base,sql,receiver_url)
+        reconciliation_spec=importlib.util.spec_from_file_location('reconciliation_checks',ROOT/'UI/e2e/reconciliation-checks.py')
+        reconciliation=importlib.util.module_from_spec(reconciliation_spec);reconciliation_spec.loader.exec_module(reconciliation)
+        reconciliation.verify_reconciliation(api,sql,wait_for,receiver_url,port_b,ARTIFACTS/'internal.key',calls)
     env = dict(os.environ, API_PROXY_TARGET=f'http://127.0.0.1:{port_a}', E2E_API_URL=base,
                E2E_RECEIVER_URL=receiver_url, E2E_UI_PORT=str(ui_port), E2E_RUN_ID=RUN)
-    result = subprocess.run(['npm', 'run', 'test:e2e'], cwd=ROOT/'UI', env=env)
+    result = subprocess.run(['npm', 'run', 'test:e2e', '--', *sys.argv[1:]], cwd=ROOT/'UI', env=env)
     if result.returncode: raise RuntimeError('Browser checks failed; inspect UI/test-results and '+str(ARTIFACTS))
-    print('PASS: complete UI and backend integration. Isolated service logs: '+str(ARTIFACTS), flush=True)
+    print(('PASS: focused browser checks. ' if BROWSER_ONLY else 'PASS: complete UI and backend integration. ')+'Isolated service logs: '+str(ARTIFACTS), flush=True)
 finally:
     for process in reversed(processes):
         process.terminate()

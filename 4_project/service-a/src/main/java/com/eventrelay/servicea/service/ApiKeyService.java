@@ -19,7 +19,9 @@ public class ApiKeyService {
     private final ResourceAccess access;
     private final SecureRandom random = new SecureRandom();
 
-    public ApiKeyService(ApiKeyRepository keys, ResourceAccess access) {
+    private final com.eventrelay.servicea.workspace.AuditLogs audit;
+    public ApiKeyService(ApiKeyRepository keys, ResourceAccess access,com.eventrelay.servicea.workspace.AuditLogs audit) {
+        this.audit=audit;
         this.keys = keys;
         this.access = access;
     }
@@ -30,9 +32,17 @@ public class ApiKeyService {
         return issue(applicationId, name.strip());
     }
 
-    public Responses.PageResult<Responses.ApiKeyDetails> list(UUID applicationId, Pageable page) {
-        requireApplication(applicationId);
-        return Responses.PageResult.from(keys.findByApplicationId(applicationId, page).map(Responses.ApiKeyDetails::from));
+    public Responses.PageResult<Responses.ApiKeyDetails> list(UUID appId, String q, String status, Pageable page) {
+        requireApplication(appId);
+        var spec=ListSearch.<ApiKey>scoped("applicationId",appId,q,"name","keyPrefix");
+        var selected=ListSearch.choices(status,Set.of("ACTIVE","REVOKED"));
+        if(selected.size()==1)spec=spec.and((root,query,cb)->selected.getFirst().equals("ACTIVE")?cb.isNull(root.get("revokedAt")):cb.isNotNull(root.get("revokedAt")));
+        return Responses.PageResult.from(keys.findAll(spec,page).map(Responses.ApiKeyDetails::from));
+    }
+    @Transactional
+    public Responses.ApiKeyDetails update(UUID appId, UUID keyId, com.eventrelay.servicea.dto.Requests.UpdateName request) {
+        access.lockedApplication(appId);
+        var key=lockedKey(appId,keyId);audit.changed(appId,"api_keys",keyId,"name",key.getName(),request.name().strip());key.updateName(request.name().strip());return Responses.ApiKeyDetails.from(key);
     }
 
     public Responses.ApiKeyDetails get(UUID applicationId, UUID keyId) {
@@ -64,6 +74,8 @@ public class ApiKeyService {
         if (secret == null || !secret.matches("er_[A-Za-z0-9_-]{43}")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid API key");
         }
+        // Only unrevoked key hashes authenticate. Revocation takes effect on the
+        // next API-key request; it neither invalidates dashboard JWTs nor cancels queued deliveries.
         UUID appId = keys.findByKeyHashAndRevokedAtIsNull(hash(secret)).map(ApiKey::getApplicationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid API key"));
         try { access.application(appId); } catch (ResponseStatusException ex) {

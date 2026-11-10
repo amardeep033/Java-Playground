@@ -13,7 +13,7 @@ public final class EventApi {
             @NotNull JsonNode payload) {}
     public record Accepted(UUID id, String eventType, int deliveryCount, Instant createdAt) {}
     public record DeliveryView(UUID id, UUID endpointId, String status, int attemptCount,
-                               Integer httpStatus, String error, Instant nextAttemptAt, Instant updatedAt, String endpointUrl, UUID replayOfId, UUID replayId) {}
+                               Integer httpStatus, String error, Instant updatedAt, String endpointUrl, UUID replayOfId, UUID replayId) {}
     public record Details(UUID id, UUID applicationId, String eventType, JsonNode payload,
-                          Instant createdAt, String status, List<DeliveryView> deliveries) {}
+                          Instant createdAt, String status, List<DeliveryView> deliveries,UUID incomingRequestId) {}
 }

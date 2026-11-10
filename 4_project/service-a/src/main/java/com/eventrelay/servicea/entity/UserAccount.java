@@ -15,6 +15,15 @@ public class UserAccount extends BaseEntity {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
     
+    @Column(name = "role", nullable = false, length = 16)
+    private String role = "USER";
+
+    public String getRole() { return role; }
+    public void changeRole(String role) { this.role = role; }
+    @Column(name="client_id",nullable=false)
+    private UUID clientId;
+    public UUID getClientId() { return clientId; }
+    public void assignClient(UUID clientId) { this.clientId=clientId; }
     protected UserAccount() {}
     public UserAccount(String name, String email, String passwordHash) {
         this.name = name;
@@ -25,4 +34,5 @@ public class UserAccount extends BaseEntity {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public void updateName(String name) { this.name=name; }
 }

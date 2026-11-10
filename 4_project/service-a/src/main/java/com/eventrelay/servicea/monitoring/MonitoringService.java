@@ -32,7 +32,7 @@ public class MonitoringService {
         return store.events(app,status,q,page,size);
     }
     public PageResult<MonitoringApi.DeliverySummary> deliveries(UUID app,String key,String status,String q,UUID eventId,UUID endpointId,boolean includeReplayed,int page,int size) {
-        authorize(app,key);validate(status,q,page,size,Set.of("PENDING","RETRY_SCHEDULED","SUCCEEDED","DEAD"));
+        authorize(app,key);validate(status,q,page,size,Set.of("PENDING","SUCCEEDED","DEAD"));
         return store.deliveries(app,status,q,eventId,endpointId,includeReplayed,page,size);
     }
     public MonitoringApi.DeliveryDetails delivery(UUID app,UUID id,String key) {
@@ -64,19 +64,24 @@ public class MonitoringService {
                 endpoint.getSigningSecretEncrypted(),endpoint.getSigningSecretVersion(),endpoint.getRateLimitPerSecond(),endpoint.getConcurrencyLimit(),endpoint.getTimeoutMs(),endpoint.getMaxAttempts(),1,at,source);
         command.validate();
         outbox.enqueue(messageId,id,RabbitMqConfig.DELIVERY_EXCHANGE,"delivery.requested",command);
-        store.replayRequest(app,idempotencyKey,source,id,at);
+        store.replayRequest(app,idempotencyKey,id,at);
         return new MonitoringApi.ReplayReceipt(id,original.eventId(),source,at);
     }
     private void authorize(UUID app,String key) {
-        var session = com.eventrelay.servicea.auth.SessionUser.current();
+        var session = com.eventrelay.servicea.auth.JwtUser.current();
+        // Monitoring/replay share their paths between API-key callers and dashboard users.
+        // Dashboard access uses a stateless HttpOnly JWT cookie (plus CSRF for replay),
+        // requires workspace membership, and still works after application keys are revoked.
+        // Use this principal only when no explicit API key was supplied.
         if (key == null && session != null) {
-            var owner = access.application(app).getUserId();
-            if (!session.admin() && !owner.equals(session.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"You do not have access to this application");
+            access.application(app); // ResourceAccess checks live workspace membership.
             return;
         }
+        // An explicit invalid/revoked key returns 401; never fall back to the JWT cookie.
  if(!keys.authenticate(key).equals(app)) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"API key belongs to another application"); }
     private void validate(String status,String q,int page,int size,Set<String> states) {
-        if(page<0||size<1||size>100||q.length()>200||(!status.isBlank()&&!states.contains(status)))
+        com.eventrelay.servicea.service.ListSearch.choices(status,states);
+        if(page<0||size<1||size>100||q.length()>200)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid filters or pagination (page >= 0, size 1–100)");
     }
 }

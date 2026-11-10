@@ -10,8 +10,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JwtTokensTest {
     @TempDir Path directory;
-    private SessionUser user(Instant expiresAt) {
-        return new SessionUser(UUID.randomUUID(), "USER", UUID.randomUUID(), expiresAt);
+    private JwtUser user(Instant expiresAt) {
+        return new JwtUser(UUID.randomUUID(), "USER", UUID.randomUUID(), expiresAt);
     }
     private JwtTokens tokens(String file) throws Exception {
         return new JwtTokens("", directory.resolve(file).toString());
@@ -22,10 +22,12 @@ class JwtTokensTest {
         String token = first.issue(user);
         var decoded = tokens("auth.key").decode(token);
         assertEquals(user.id().toString(), decoded.getSubject());
-        assertEquals(user.sessionId().toString(), decoded.getId());
+        assertEquals(user.tokenId().toString(), decoded.getId());
         assertEquals("event-relay", decoded.getClaimAsString("iss"));
         assertFalse(decoded.hasClaim("password"));
-        assertFalse(decoded.hasClaim("role")); // Current DB role is used, not an outdated JWT claim.
+        assertEquals("USER",decoded.getClaimAsString("role"));
+        assertEquals("USER",tokens("auth.key").authenticate(token).role());
+        assertTrue(decoded.getAudience().contains("event-relay-dashboard"));
     }
     @Test void rejectsModifiedPayloadWithOriginalSignature() throws Exception {
         var tokens = tokens("auth.key");
@@ -35,7 +37,7 @@ class JwtTokensTest {
     }
     @Test void rejectsExpiredJwtEvenWithValidSignature() throws Exception {
         var tokens = tokens("auth.key");
-        var claims = new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer("event-relay")
+        var claims = new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer("event-relay").audience("event-relay-dashboard").claim("role","USER").claim("token_use","access")
                 .subject(UUID.randomUUID().toString()).jwtID(UUID.randomUUID().toString())
                 .issueTime(Date.from(Instant.now().minusSeconds(600)))
                 .expirationTime(Date.from(Instant.now().minusSeconds(300))).build();
@@ -52,5 +54,27 @@ class JwtTokensTest {
     }
     @Test void refusesUndersizedConfiguredKey() {
         assertThrows(IllegalArgumentException.class, () -> new JwtTokens(Base64.getEncoder().encodeToString(new byte[16]), "unused"));
+    }
+    private String signedToken(String role,String audience,String issuer,boolean includeRole) throws Exception {
+        tokens("auth.key");
+        var claims=new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(issuer).audience(audience)
+                .subject(UUID.randomUUID().toString()).jwtID(UUID.randomUUID().toString())
+                .issueTime(Date.from(Instant.now())).expirationTime(Date.from(Instant.now().plusSeconds(600)))
+                .claim("token_use","access");
+        if(includeRole) claims.claim("role",role);
+        var signed=new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader(com.nimbusds.jose.JWSAlgorithm.HS256),claims.build());
+        signed.sign(new com.nimbusds.jose.crypto.MACSigner(Base64.getDecoder().decode(java.nio.file.Files.readString(directory.resolve("auth.key")))));
+        return signed.serialize();
+    }
+    @Test void rejectsLegacyTokensWithoutSignedRole() throws Exception {
+        var tokens=tokens("auth.key");var token=signedToken("USER","event-relay-dashboard","event-relay",false);
+        assertThrows(JwtException.class,()->tokens.authenticate(token));
+    }
+    @Test void rejectsUnknownRoleWrongAudienceAndWrongIssuer() throws Exception {
+        var tokens=tokens("auth.key");
+        for(var token:List.of(signedToken("SUPERADMIN","event-relay-dashboard","event-relay",true),
+                signedToken("USER","another-service","event-relay",true),signedToken("APP_ADMIN","event-relay-dashboard","another-issuer",true))) {
+            assertThrows(JwtException.class,()->tokens.authenticate(token));
+        }
     }
 }
