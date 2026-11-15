@@ -1,0 +1,61 @@
+0. Env:
+- JVM(vm that executes bytecode) < JRE(class lib for runtime env) < JDK(+dev tools)
+- source code(.java) -> compile(javac compiler creates .class bytecode) -> run(starts jvm & converts to machine code & calls main)
+- due to specific jvm -- its WORA
+- maven vs gradle: simple, easy, slow, old, default vs faster, complex, hard, new
+
+1. In one .java file:
+- we can have only one public class 
+- it should match the file name 
+- and it cant be static
+- static means belongs to class - shared by obj - so call without obj -- nested class, block, method and variable
+- final means cant be reassigned -- variable, method, parameter, class
+
+2. public static void main(string[] args):
+- public: because jvm can call from outside 
+- static: because jvm can call directly without obj creation
+- void: doesn't return anything
+- main: this is the starting point, can be overloaded
+- string[] args: cli args
+
+3. oops:
+- interface: what it can do(unrelated class) - implement many
+- abstract: what it is(close relation) - extend to one -- contract on subclasses
+- ref type(Acc) and Obj type(SA) -- this pattern for generic type fn call
+
+4. features:
+- abs: fn exposed instead of same logic everywhere which can go wrong in change or order, so one place
+- encap: method and variable in one class, access modifiers
+- poly: dynamic(fn overriding - runtime) and static(fn overloading - compile time)
+- inher: generic call using interface so accepted type 
+
+5. solid:
+- S: dont have many resp in same class, hard to test, change
+- O: open for new, closed for existing
+- L: subs with sibling class obj, shouldnt break the behavior
+- I: no fat interface such that it makes class start throwing error
+- D: DI is one pattern that satisfies DIP — you inject the abstraction from outside instead of creating it inside
+
+6. spring:
+- without spring: manual DI + in all .java file
+- with spring(manual): wiring moved to single file + bean + context.getBean(Service.class)
+- with spring(auto): component scan + component + but still context.getBean(Service.class)*
+- with springboot: no config file, only components directly + no need of context.getBean(Service.class) + configure MVC
+
+(not needed in case of web?)
+- Why getBean()? Because your main() method is outside Spring's bean management. 
+- You need a way to obtain the first Spring-managed object. Once you're inside Spring-managed objects, constructor injection handles the dependencies.
+- so in case of non mvc, both may requires getBean and in case of mvc, none requires getBean 
+- as this is dependant on startup, may require because other ways like event handler to bypass
+
+7. structure:
+Type                     | What triggers execution? | Typical entry point             | Needs web server?
+-------------------------+--------------------------+---------------------------------+------------------
+Standalone / CLI         | User runs program        | main()                          | No
+Web MVC / REST API       | HTTP request             | @GetMapping, @PostMapping       | Yes
+Scheduled application    | Time / cron              | @Scheduled                      | No
+Message-driven worker    | Kafka / RabbitMQ message | @KafkaListener, @RabbitListener | No
+Batch application        | Job execution            | Spring Batch Job                | No
+Event-driven application | Application event        | @EventListener                  | No
+WebSocket application    | WebSocket message        | @MessageMapping                 | Yes, usually
+Library / SDK            | Another program calls it | Public methods                  | No
