@@ -1,13 +1,18 @@
 package com.eventrelay.servicea.monitoring;
 
+import com.eventrelay.servicea.auth.access.ResourceAccess;
+import com.eventrelay.servicea.common.dto.PageResult;
+import com.eventrelay.servicea.endpoint.Endpoint;
+import com.eventrelay.servicea.monitoring.dto.MonitoringApi;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.*;
 import java.sql.*;
 import java.time.*;
 import java.util.*;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.*;
 import org.springframework.stereotype.Repository;
-import com.eventrelay.servicea.dto.Responses.PageResult;
+import org.springframework.web.server.ResponseStatusException;
 
 @Repository
 public class MonitoringStore {
@@ -76,7 +81,7 @@ public class MonitoringStore {
     }
     public void lock(UUID appId, UUID id) {
         if (jdbc.queryForList("SELECT id FROM service_a.delivery_projections WHERE application_id=? AND id=? FOR UPDATE",appId,id).isEmpty()) {
-            throw com.eventrelay.servicea.service.ResourceAccess.notFound("Delivery");
+            throw ResourceAccess.notFound("Delivery");
         }
     }
     public JsonNode requestBody(UUID id) {
@@ -86,7 +91,7 @@ public class MonitoringStore {
     }
     public String rawBody(UUID id) {
         var rows=jdbc.query("SELECT payload->>'body' FROM service_a.outbox_messages WHERE aggregate_id=? AND routing_key='delivery.requested' ORDER BY created_at LIMIT 1",(rs,n)->rs.getString(1),id);
-        if (rows.isEmpty() || rows.getFirst()==null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"Original request body is unavailable");
+        if (rows.isEmpty() || rows.getFirst()==null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Original request body is unavailable");
         return rows.getFirst();
     }
     public UUID eventTypeId(UUID eventId) { return jdbc.queryForObject("SELECT event_type_id FROM service_a.received_events WHERE id=?",UUID.class,eventId); }
@@ -101,7 +106,7 @@ public class MonitoringStore {
         var rows=jdbc.query("SELECT r.delivery_id,d.replay_of_id,r.created_at FROM service_a.replay_requests r JOIN service_a.delivery_projections d ON d.id=r.delivery_id AND d.application_id=r.application_id WHERE r.application_id=? AND r.idempotency_key=?",(rs,n)->new MonitoringApi.ReplayReceipt(rs.getObject(1,UUID.class),null,rs.getObject(2,UUID.class),rs.getTimestamp(3).toInstant()),appId,key);
         if(rows.isEmpty()) return Optional.empty();
         var receipt=rows.getFirst();
-        if(!source.equals(receipt.replayOfId())) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"Idempotency-Key was used for another replay");
+        if(!source.equals(receipt.replayOfId())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Idempotency-Key was used for another replay");
         UUID eventId=jdbc.queryForObject("SELECT event_id FROM service_a.delivery_projections WHERE id=?",UUID.class,receipt.id());
         return Optional.of(new MonitoringApi.ReplayReceipt(receipt.id(),eventId,source,receipt.createdAt()));
     }

@@ -1,13 +1,17 @@
 package com.eventrelay.servicea.monitoring;
 
+import com.eventrelay.servicea.common.dto.PageResult;
+import com.eventrelay.servicea.monitoring.dto.MonitoringApi;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import com.eventrelay.servicea.dto.Responses.PageResult;
 
 @RestController
 @RequestMapping("/api/v1/applications/{applicationId}")
 public class MonitoringController {
+    //request dto: none (query/path parameters and headers only)
+    //response dto: PageResult<MonitoringApi.EventSummary>, PageResult<MonitoringApi.DeliverySummary>, MonitoringApi.DeliveryDetails, MonitoringApi.Summary, MonitoringApi.ReplayReceipt
+
     private final MonitoringService service;
     public MonitoringController(MonitoringService service) { this.service=service; }
     @GetMapping("/events")

@@ -1,0 +1,74 @@
+
+HTTP REST --- customer events + UI APIs --- Up to 32 request threads
+RabbitMQ --- final status updates from B --- 4 listener threads
+Outbox publishing + reconciliation --- 2 shared scheduler threads
+
+
+user password + salt
+access token jwt
+jwt signing key
+refresh token
+csrf token 
+customer api key
+endpoint signing secret
+signing secret enc key
+internal service token
+database cred
+rabbitmq cred
+idempotency key
+outbox claim token
+rabbitmq routing key
+aes gcm nonce
+
+
+_schema_ + _main_ + _pom.xml_ + _app.prop_ + _config_
+_entity_ + _dto_ + _controller_
+_service + _repository
+_auth + _security
+
+_messaging + _events + _ingress
+_reconcilation + _monitoring + _workspace 
+_exception + _test
+
+// MVC flow: Controller(DTO - record) -> Service(model - sep comes in DDD) -> Repository(entity - JPA)
+
+// fix N=1 here
+// Location	What happens
+// [`RegistrationService.listEndpoints()` (line 229)](src/main/java/com/eventrelay/servicea/service/RegistrationService.java:229)	Loads a page of endpoints, then converts each endpoint to a DTO.
+// [`Responses.WebhookEndpoint.from()` (line 41)](src/main/java/com/eventrelay/servicea/dto/Responses.java:41)	Calls getEventTypes() for each endpoint, initializing its lazy collection with an additional query.
+
+
+// Because [`Endpoint.eventTypes` (line 56)](src/main/java/com/eventrelay/servicea/entity/Endpoint.java:56) is @ManyToMany(fetch = LAZY), listing 20 endpoints can produce 1 endpoint query + 20 subscription queries, plus pagination/count and authorization queries.
+
+// N+1 Fix options:
+// - JOIN FETCH: JPQL query explicitly fetches orders + items.
+// - @EntityGraph: repository method declares the fetch plan without custom JPQL.
+// - @BatchSize: query orders first, then Hibernate groups lazy item queries using where order_id in (...).
+
+always import
+rename service name
+replace PESSIMISTIC_WRITE with transactional 
+
+
+//------------------------------------------------
+
+others 0
+
+user 2
+app 2
+apikey 2
+eventTypes 2
+endpoint 6
+
+common 6
+auth
+
+delivery
+events
+ingress
+
+monitoring
+workspace
+
+tests
+

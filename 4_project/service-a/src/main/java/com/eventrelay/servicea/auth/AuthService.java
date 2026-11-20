@@ -1,7 +1,9 @@
 package com.eventrelay.servicea.auth;
 
+import com.eventrelay.servicea.common.search.ListSearch;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,7 +48,7 @@ public class AuthService {
             int failures = locked != null || started.plusSeconds(900).isBefore(now) ? 1 : ((Number)guard.get("failures")).intValue()+1;
             Instant until = failures >= 5 ? now.plusSeconds(900) : null;
             db.update("UPDATE service_a.login_guards SET failures=?,window_started_at=?,locked_until=? WHERE email_hash=?",
-                    failures,java.sql.Timestamp.from(failures==1 ? now : started),until==null?null:java.sql.Timestamp.from(until),hash);
+                    failures,Timestamp.from(failures==1 ? now : started),until==null?null:Timestamp.from(until),hash);
             audit(account,hash,ip,"BAD_CREDENTIALS");
             return new LoginResult(null,401,"Email or password is incorrect.",0,null);
         }
@@ -56,12 +58,12 @@ public class AuthService {
         return new LoginResult(user,200,null,0,refreshTokens.create(user));
     }
     public List<Map<String,Object>> attempts(UUID user, String q) {
-        return db.queryForList("SELECT attempted_at,(reason='SUCCESS') AS success,reason,ip_address FROM service_a.login_attempts WHERE user_id=? AND (lower(reason) LIKE ? ESCAPE '!' OR lower(ip_address) LIKE ? ESCAPE '!') ORDER BY attempted_at DESC,id DESC LIMIT 20",user,com.eventrelay.servicea.service.ListSearch.pattern(q),com.eventrelay.servicea.service.ListSearch.pattern(q));
+        return db.queryForList("SELECT attempted_at,(reason='SUCCESS') AS success,reason,ip_address FROM service_a.login_attempts WHERE user_id=? AND (lower(reason) LIKE ? ESCAPE '!' OR lower(ip_address) LIKE ? ESCAPE '!') ORDER BY attempted_at DESC,id DESC LIMIT 20",user,ListSearch.pattern(q),ListSearch.pattern(q));
     }
     private void audit(Account user,String hash,String ip,String reason) {
         db.update("INSERT INTO service_a.login_attempts(id,user_id,email_hash,reason,ip_address) VALUES (?,?,?,?,?)",UUID.randomUUID(),user==null?null:user.id(),hash,reason,ip);
     }
-    private static Instant instant(Object value) { return value==null?null:((java.sql.Timestamp)value).toInstant(); }
+    private static Instant instant(Object value) { return value==null?null:((Timestamp)value).toInstant(); }
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException error) { throw new IllegalStateException(error); }

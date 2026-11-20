@@ -1,9 +1,9 @@
 package com.eventrelay.servicea.auth;
 
+import jakarta.servlet.http.Cookie;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.UUID;
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.*;

@@ -1,16 +1,17 @@
 package com.eventrelay.servicea.auth;
 
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.time.*;
 import java.util.*;
 import javax.crypto.spec.SecretKeySpec;
-import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
-import org.springframework.security.oauth2.core.*;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,7 +19,7 @@ public class JwtTokens {
     private final NimbusJwtEncoder encoder;
     private final NimbusJwtDecoder decoder;
     public JwtTokens(@Value("${app.auth.jwt-key:}") String configured,
-                     @Value("${app.auth.key-file:.local/auth.key}") String filename) throws java.io.IOException {
+                     @Value("${app.auth.key-file:.local/auth.key}") String filename) throws IOException {
         String encoded = configured;
         if (encoded.isBlank()) {
             Path path = Path.of(filename).toAbsolutePath();

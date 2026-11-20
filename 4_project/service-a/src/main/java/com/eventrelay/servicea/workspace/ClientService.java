@@ -1,13 +1,19 @@
 package com.eventrelay.servicea.workspace;
 
+import com.eventrelay.servicea.application.Application;
+import com.eventrelay.servicea.auth.access.WorkspaceAccess;
+import com.eventrelay.servicea.common.search.ListSearch;
+import com.eventrelay.servicea.user.UserAccount;
+import com.eventrelay.servicea.user.UserAccountRepository;
+import com.eventrelay.servicea.user.dto.UserResponse;
+import com.eventrelay.servicea.workspace.dto.AccountUpdate;
+import com.eventrelay.servicea.workspace.dto.ClientUser;
 import java.util.*;
-import com.eventrelay.servicea.dto.Requests.*;
-import com.eventrelay.servicea.dto.Responses;
-import com.eventrelay.servicea.entity.UserAccount;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -16,9 +22,9 @@ public class ClientService {
     private final JdbcTemplate db;
     private final WorkspaceAccess access;
     private final AuditLogs audit;
-    private final com.eventrelay.servicea.repository.UserAccountRepository users;
-    private final org.springframework.security.crypto.password.PasswordEncoder passwords;
-    public ClientService(JdbcTemplate db,WorkspaceAccess access,AuditLogs audit,com.eventrelay.servicea.repository.UserAccountRepository users,org.springframework.security.crypto.password.PasswordEncoder passwords) {
+    private final UserAccountRepository users;
+    private final PasswordEncoder passwords;
+    public ClientService(JdbcTemplate db,WorkspaceAccess access,AuditLogs audit,UserAccountRepository users,PasswordEncoder passwords) {
         this.db=db;this.access=access;this.audit=audit;this.users=users;this.passwords=passwords;
     }
     public Map<String,Object> get(UUID client) {
@@ -31,8 +37,8 @@ public class ClientService {
     public UserList users(UUID client,String q,String role,int page,int size) {
         access.clientAdmin(client);WorkspaceAccess.validatePage(q,page,size);
         String where="client_id=? AND deleted_at IS NULL AND (lower(name) LIKE ? ESCAPE '!' OR lower(email) LIKE ? ESCAPE '!' OR lower(role) LIKE ? ESCAPE '!')";
-        String pattern=com.eventrelay.servicea.service.ListSearch.pattern(q);
-        var selected=com.eventrelay.servicea.service.ListSearch.choices(role,Set.of("ADMIN","USER"));
+        String pattern=ListSearch.pattern(q);
+        var selected=ListSearch.choices(role,Set.of("ADMIN","USER"));
         var params=new ArrayList<Object>(List.of(client,pattern,pattern,pattern));
         if(!selected.isEmpty()){where+=" AND role IN ("+String.join(",",Collections.nCopies(selected.size(),"?"))+")";params.addAll(selected);}
         long count=db.queryForObject("SELECT count(*) FROM service_a.users WHERE "+where,Long.class,params.toArray());
@@ -54,7 +60,7 @@ public class ClientService {
         return new UserList(rows,page,size,count,(int)((count+size-1)/size),apps);
     }
     @Transactional
-    public Responses.User createUser(UUID client,ClientUser request) {
+    public UserResponse createUser(UUID client,ClientUser request) {
         lock(client);access.clientAdmin(client);
         var account=new UserAccount(request.name().strip(),request.email().strip().toLowerCase(Locale.ROOT),passwords.encode(request.password()));
         account.assignClient(client);account.changeRole(request.role());users.saveAndFlush(account);
@@ -65,7 +71,7 @@ public class ClientService {
             db.update("INSERT INTO service_a.workspace_members(id,application_id,user_id,client_id) VALUES (?,?,?,?)",UUID.randomUUID(),app,account.getId(),client);
         }
         audit.writeClient(client,"users",account.getId(),"USER_CREATED",Map.of("role",request.role(),"applicationIds",apps));
-        return Responses.User.from(account);
+        return UserResponse.from(account);
     }
     @Transactional
     public void updateAccount(UUID client,UUID user,AccountUpdate request) {

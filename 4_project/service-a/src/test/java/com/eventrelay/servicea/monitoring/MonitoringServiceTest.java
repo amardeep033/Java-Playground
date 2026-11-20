@@ -1,12 +1,18 @@
 package com.eventrelay.servicea.monitoring;
 
+import com.eventrelay.servicea.apikey.ApiKeyService;
+import com.eventrelay.servicea.auth.access.ResourceAccess;
+import com.eventrelay.servicea.delivery.messaging.DeliveryCommand;
+import com.eventrelay.servicea.delivery.outbox.Outbox;
+import com.eventrelay.servicea.endpoint.Endpoint;
+import com.eventrelay.servicea.endpoint.EndpointDeliveryReader;
+import com.eventrelay.servicea.endpoint.EndpointRepository;
+import com.eventrelay.servicea.delivery.persistence.DeliveryProjectionStore;
+import com.eventrelay.servicea.eventtype.EventType;
+import com.eventrelay.servicea.eventtype.EventTypeRepository;
+import com.eventrelay.servicea.monitoring.dto.MonitoringApi;
 import java.time.Instant;
 import java.util.*;
-import com.eventrelay.servicea.entity.*;
-import com.eventrelay.servicea.events.EventStore;
-import com.eventrelay.servicea.messaging.*;
-import com.eventrelay.servicea.repository.*;
-import com.eventrelay.servicea.service.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -19,22 +25,22 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MonitoringServiceTest {
     @Mock ApiKeyService keys; @Mock ResourceAccess access; @Mock MonitoringStore store;
-    @Mock EventStore events; @Mock EndpointRepository endpoints; @Mock EventTypeRepository types; @Mock Outbox outbox;
+    @Mock DeliveryProjectionStore deliveries; @Mock EndpointRepository endpoints; @Mock EventTypeRepository types; @Mock Outbox outbox;
     UUID app=UUID.randomUUID(),source=UUID.randomUUID(),event=UUID.randomUUID(),endpointId=UUID.randomUUID(),typeId=UUID.randomUUID();
     MonitoringService service;
-    @BeforeEach void setup(){ service=new MonitoringService(keys,access,store,events,endpoints,types,outbox); }
+    @BeforeEach void setup(){ service=new MonitoringService(keys,access,store,deliveries,new EndpointDeliveryReader(endpoints),types,outbox); }
     @Test void replayRetryReturnsTheOriginalReceiptWithoutPublishingAgain(){
         when(keys.authenticate("key")).thenReturn(app);
         var receipt=new MonitoringApi.ReplayReceipt(UUID.randomUUID(),event,source,Instant.now());
         when(store.replay(app,"request",source)).thenReturn(Optional.of(receipt));
         assertEquals(receipt,service.replay(app,source,"key","request"));
-        verifyNoInteractions(events,endpoints,types,outbox);
+        verifyNoInteractions(deliveries,endpoints,types,outbox);
     }
     @Test void successfulOrPendingDeliveryCannotBeReplayed(){
         when(keys.authenticate("key")).thenReturn(app);
         when(store.delivery(app,source)).thenReturn(Optional.of(delivery(false,"Only permanently failed deliveries can be replayed")));
         var error=assertThrows(ResponseStatusException.class,()->service.replay(app,source,"key","request"));
-        assertEquals(409,error.getStatusCode().value()); verifyNoInteractions(outbox,events);
+        assertEquals(409,error.getStatusCode().value()); verifyNoInteractions(outbox,deliveries);
     }
     @Test void replayUsesNewDeliveryIdentityAndCurrentEndpointSnapshot(){
         when(keys.authenticate("key")).thenReturn(app);
@@ -52,7 +58,7 @@ class MonitoringServiceTest {
         assertEquals(source,command.getValue().replayOfId());assertEquals(1,command.getValue().attemptNumber());
         assertEquals("current-encrypted",command.getValue().signingSecretEncrypted());assertEquals(12000,command.getValue().timeoutMs());
         assertEquals("{\"original\":true}",command.getValue().body());
-        verify(events).delivery(receipt.id(),event,app,endpointId,endpoint.getUrl(),source);
+        verify(deliveries).delivery(receipt.id(),event,app,endpointId,endpoint.getUrl(),source);
         verify(store).replayRequest(eq(app),eq("request"),eq(receipt.id()),any());
     }
     @Test void anotherAppsKeyCannotReadMonitoring(){

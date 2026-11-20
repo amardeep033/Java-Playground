@@ -1,9 +1,11 @@
 package com.eventrelay.servicea.auth;
 
-import java.io.IOException;
-import java.util.List;
+import com.eventrelay.servicea.common.config.SecurityConfig;
+import com.eventrelay.servicea.ingress.IncomingRequestContext;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
+import java.io.IOException;
+import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                             user,null,List.of(new SimpleGrantedAuthority("ROLE_"+user.role()))));
                 } catch (JwtException | IllegalArgumentException invalid) {
-                    com.eventrelay.servicea.ingress.IncomingRequestContext.reason(request,com.eventrelay.servicea.ingress.IncomingRequestContext.Reason.INVALID_JWT);
+                    IncomingRequestContext.reason(request,IncomingRequestContext.Reason.INVALID_JWT);
                     response.setHeader("WWW-Authenticate","Bearer error=\"invalid_token\"");
                     SecurityConfig.problem(response,401,"Invalid or expired access token");
                     return;

@@ -1,12 +1,13 @@
 package com.eventrelay.servicea.workspace;
 
+import com.eventrelay.servicea.auth.access.ResourceAccess;
+import com.eventrelay.servicea.auth.access.WorkspaceAccess;
 import java.util.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
-import com.eventrelay.servicea.service.ResourceAccess;
 
 @Service
 @Transactional(readOnly=true)

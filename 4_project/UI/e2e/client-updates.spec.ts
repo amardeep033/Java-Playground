@@ -11,7 +11,11 @@ test("company admin creates mapped users and promotes them through the same logi
  await dialog.getByRole("checkbox").check();await dialog.getByRole("button",{name:"Create user",exact:true}).click();
  const row=page.getByRole("row").filter({hasText:`bob-${suffix}@example.com`});await expect(row).toBeVisible();
  await row.getByRole("button",{name:"Edit Bob",exact:true}).click();
- await page.getByRole("dialog").getByLabel("Role",{exact:true}).selectOption("ADMIN");await page.getByRole("button",{name:"Save changes",exact:true}).click();
+ await page.getByRole("dialog").getByLabel("Role",{exact:true}).selectOption("ADMIN");
+ const roleSaved=page.waitForResponse(response=>response.request().method()==="PUT" && response.url().includes(`/clients/${owner.clientId}/users/`) && !response.url().endsWith("/password"));
+ await page.getByRole("button",{name:"Save changes",exact:true}).click();
+ expect((await roleSaved).status()).toBe(204);
+ await expect(page.getByRole("button",{name:"Save changes",exact:true})).toBeEnabled();
  await expect(page.getByRole("dialog").getByLabel("Role",{exact:true})).toHaveValue("ADMIN");
  await page.getByRole("button",{name:"Close dialog",exact:true}).click();
  await expect(row.getByRole("cell",{name:"ADMIN",exact:true})).toBeVisible();

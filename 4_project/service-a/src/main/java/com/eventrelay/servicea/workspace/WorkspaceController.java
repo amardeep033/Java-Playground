@@ -1,17 +1,21 @@
 package com.eventrelay.servicea.workspace;
 
-import java.util.*;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class WorkspaceController {
+    //request dto: Member
+    //response dto: none (no response body)
+
     private final WorkspaceService workspaces;
     public WorkspaceController(WorkspaceService workspaces) { this.workspaces=workspaces; }
     public record Member(@NotNull UUID userId) {
-        @com.fasterxml.jackson.annotation.JsonAnySetter public void reject(String name,Object value) { throw new IllegalArgumentException("Only userId is accepted; roles live in users.role"); }
+        @JsonAnySetter public void reject(String name,Object value) { throw new IllegalArgumentException("Only userId is accepted; roles live in users.role"); }
     }
     @PutMapping("/api/v1/applications/{applicationId}/members") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void member(@PathVariable UUID applicationId,@Valid @RequestBody Member request) { workspaces.setMember(applicationId,request.userId()); }

@@ -1,12 +1,16 @@
 package com.eventrelay.servicea.workspace;
 
-import java.util.*;
+import com.eventrelay.servicea.auth.JwtUser;
+import com.eventrelay.servicea.auth.access.WorkspaceAccess;
+import com.eventrelay.servicea.common.search.ListSearch;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import com.eventrelay.servicea.auth.JwtUser;
-import com.eventrelay.servicea.service.ListSearch;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Successful changes only, committed atomically with their mutation. Never pass credential values here. */
 @Service
@@ -39,7 +43,7 @@ public class AuditLogs {
                     UUID.randomUUID(),app,actor.id(),entity,id,action,mapper.writeValueAsString(safe),client);
         } catch(JsonProcessingException e) { throw new IllegalStateException("Cannot encode audit metadata"); }
     }
-    private void rejectSecrets(com.fasterxml.jackson.databind.JsonNode node) {
+    private void rejectSecrets(JsonNode node) {
         if(node.isObject()) node.fields().forEachRemaining(entry->{
             String key=entry.getKey().replaceAll("[^a-zA-Z]","").toLowerCase(Locale.ROOT);
             if(key.contains("password")||key.contains("secret")||key.contains("token")||key.contains("keyhash")||key.equals("apikey")||key.equals("authorization"))
@@ -94,5 +98,5 @@ public class AuditLogs {
     }
     private String placeholders(int count) {return String.join(",",Collections.nCopies(count,"?"));}
     private void uuid(String value) {try {UUID.fromString(value);}catch(IllegalArgumentException e){throw badFilter();}}
-    private org.springframework.web.server.ResponseStatusException badFilter() {return new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"Invalid audit filter");}
+    private ResponseStatusException badFilter() {return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid audit filter");}
 }

@@ -1,29 +1,34 @@
 package com.eventrelay.servicea.auth;
 
-import java.time.*;
-import java.util.*;
+import com.eventrelay.servicea.user.UserService;
+import com.eventrelay.servicea.user.dto.UserResponse;
 import jakarta.servlet.http.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import java.time.*;
+import java.util.*;
 import org.springframework.http.*;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
-import com.eventrelay.servicea.dto.Responses;
-import com.eventrelay.servicea.service.RegistrationService;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+    //request dto: Login
+    //response dto: Me (contains UserResponse and Permissions), Map<String, String>, Map<String, Object>, List<Map<String, Object>>
+
     private final AuthService auth;
     private final RefreshTokens refreshTokens;
     private final JwtCookies cookies;
-    private final RegistrationService users;
-    public AuthController(AuthService auth,JwtCookies cookies,RegistrationService users,RefreshTokens refreshTokens) {
+    private final UserService users;
+    public AuthController(AuthService auth,JwtCookies cookies,UserService users,RefreshTokens refreshTokens) {
         this.refreshTokens=refreshTokens;this.auth=auth;this.cookies=cookies;this.users=users;
     }
     public record Login(@NotBlank @Email @Size(max=320) String email,@NotBlank @Size(max=128) String password) { }
     public record Permissions(boolean manageUsers,boolean createApplications) { }
-    public record Me(Responses.User user,String role,Instant expiresAt,Permissions permissions) { }
-    @GetMapping("/csrf") public ResponseEntity<Map<String,String>> csrf(org.springframework.security.web.csrf.CsrfToken token) {
+    public record Me(UserResponse user,String role,Instant expiresAt,Permissions permissions) { }
+    @GetMapping("/csrf") public ResponseEntity<Map<String,String>> csrf(CsrfToken token) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("token",token.getToken(),"headerName",token.getHeaderName()));
     }
     @PostMapping("/login") public ResponseEntity<?> login(@Valid @RequestBody Login login,HttpServletRequest request,HttpServletResponse response) {
@@ -51,10 +56,10 @@ public class AuthController {
     }
     @GetMapping("/me") public Me me() { return me(JwtUser.current()); }
     private Me me(JwtUser user) {
-        Responses.User account;
+        UserResponse account;
         try { account=users.getUser(user.id()); }
-        catch(org.springframework.web.server.ResponseStatusException missing) {
-            if(missing.getStatusCode().value()==404) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED,"Please sign in again.");
+        catch(ResponseStatusException missing) {
+            if(missing.getStatusCode().value()==404) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Please sign in again.");
             throw missing;
         }
         boolean admin="ADMIN".equals(account.role());

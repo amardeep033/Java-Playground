@@ -1,5 +1,12 @@
 package com.eventrelay.servicea.auth;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
@@ -32,18 +39,18 @@ class JwtTokensTest {
     @Test void rejectsModifiedPayloadWithOriginalSignature() throws Exception {
         var tokens = tokens("auth.key");
         String[] parts = tokens.issue(user(Instant.now().plusSeconds(3600))).split("\\.");
-        parts[1] = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"sub\":\"admin\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        parts[1] = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"sub\":\"admin\"}".getBytes(StandardCharsets.UTF_8));
         assertThrows(JwtException.class, () -> tokens.decode(String.join(".", parts)));
     }
     @Test void rejectsExpiredJwtEvenWithValidSignature() throws Exception {
         var tokens = tokens("auth.key");
-        var claims = new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer("event-relay").audience("event-relay-dashboard").claim("role","USER").claim("token_use","access")
+        var claims = new JWTClaimsSet.Builder().issuer("event-relay").audience("event-relay-dashboard").claim("role","USER").claim("token_use","access")
                 .subject(UUID.randomUUID().toString()).jwtID(UUID.randomUUID().toString())
                 .issueTime(Date.from(Instant.now().minusSeconds(600)))
                 .expirationTime(Date.from(Instant.now().minusSeconds(300))).build();
-        var signed = new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader(com.nimbusds.jose.JWSAlgorithm.HS256), claims);
-        byte[] key = Base64.getDecoder().decode(java.nio.file.Files.readString(directory.resolve("auth.key")));
-        signed.sign(new com.nimbusds.jose.crypto.MACSigner(key));
+        var signed = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        byte[] key = Base64.getDecoder().decode(Files.readString(directory.resolve("auth.key")));
+        signed.sign(new MACSigner(key));
         String token = signed.serialize();
         assertThrows(JwtException.class, () -> tokens.decode(token));
     }
@@ -57,13 +64,13 @@ class JwtTokensTest {
     }
     private String signedToken(String role,String audience,String issuer,boolean includeRole) throws Exception {
         tokens("auth.key");
-        var claims=new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(issuer).audience(audience)
+        var claims=new JWTClaimsSet.Builder().issuer(issuer).audience(audience)
                 .subject(UUID.randomUUID().toString()).jwtID(UUID.randomUUID().toString())
                 .issueTime(Date.from(Instant.now())).expirationTime(Date.from(Instant.now().plusSeconds(600)))
                 .claim("token_use","access");
         if(includeRole) claims.claim("role",role);
-        var signed=new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader(com.nimbusds.jose.JWSAlgorithm.HS256),claims.build());
-        signed.sign(new com.nimbusds.jose.crypto.MACSigner(Base64.getDecoder().decode(java.nio.file.Files.readString(directory.resolve("auth.key")))));
+        var signed=new SignedJWT(new JWSHeader(JWSAlgorithm.HS256),claims.build());
+        signed.sign(new MACSigner(Base64.getDecoder().decode(Files.readString(directory.resolve("auth.key")))));
         return signed.serialize();
     }
     @Test void rejectsLegacyTokensWithoutSignedRole() throws Exception {
