@@ -18,9 +18,11 @@ public class IncomingRequestService {
         this.access = access;
     }
 
-    public PageResult<IncomingRequestEntry> list(UUID applicationId, String status, String q, String apiKeyName,
-            String authMethod, Integer httpStatus, int page, int size) {
-        access.application(applicationId); // Includes server-side workspace membership validation.
-        return store.list(applicationId, status, q, apiKeyName, authMethod, httpStatus, page, size);
+    public PageResult<IncomingRequestEntry> list(UUID app_id, String status, String q, String api_key_name,
+            String auth_method, Integer http_status, int page, int size) {
+        
+        // checks whether the application exists and the current user can access it
+        access.application(app_id); 
+        return store.list(app_id, status, q, api_key_name, auth_method, http_status, page, size);
     }
 }

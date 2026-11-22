@@ -18,10 +18,10 @@ public class SecretEncryption {
     private final SecretKeySpec key;
     private final SecureRandom random = new SecureRandom();
 
-    public SecretEncryption(@Value("${app.signing.encryption-key:}") String encodedKey,
-            @Value("${app.signing.key-file:.local/signing.key}") String keyFile) {
+    public SecretEncryption(@Value("${app.signing.encryption-key:}") String encoded_key,
+            @Value("${app.signing.key-file:.local/signing.key}") String key_file) {
         try {
-            byte[] bytes = Base64.getDecoder().decode(encodedKey.isBlank() ? localKey(Path.of(keyFile)) : encodedKey);
+            byte[] bytes = Base64.getDecoder().decode(encoded_key.isBlank() ? localKey(Path.of(key_file)) : encoded_key);
             if (bytes.length != 32)
                 throw new IllegalArgumentException("Signing encryption key must contain 32 bytes");
             key = new SecretKeySpec(bytes, "AES");
@@ -37,12 +37,12 @@ public class SecretEncryption {
         return "whsec_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    public String encrypt(String secret, UUID endpointId) {
+    public String encrypt(String signing_secret, UUID endpoint_id) {
         try {
             byte[] nonce = new byte[12];
             random.nextBytes(nonce);
-            Cipher cipher = cipher(Cipher.ENCRYPT_MODE, nonce, endpointId);
-            byte[] encrypted = cipher.doFinal(secret.getBytes(StandardCharsets.UTF_8));
+            Cipher cipher = cipher(Cipher.ENCRYPT_MODE, nonce, endpoint_id);
+            byte[] encrypted = cipher.doFinal(signing_secret.getBytes(StandardCharsets.UTF_8));
             byte[] envelope = new byte[nonce.length + encrypted.length];
             System.arraycopy(nonce, 0, envelope, 0, nonce.length);
             System.arraycopy(encrypted, 0, envelope, nonce.length, encrypted.length);
@@ -53,12 +53,12 @@ public class SecretEncryption {
     }
 
     // Internal use by a future delivery implementation. There is no reveal API.
-    public String decrypt(String encrypted, UUID endpointId) {
+    public String decrypt(String encrypted, UUID endpoint_id) {
         try {
             byte[] envelope = Base64.getDecoder().decode(encrypted);
             if (envelope.length < 29)
                 throw new IllegalArgumentException("Invalid encrypted secret");
-            Cipher cipher = cipher(Cipher.DECRYPT_MODE, Arrays.copyOf(envelope, 12), endpointId);
+            Cipher cipher = cipher(Cipher.DECRYPT_MODE, Arrays.copyOf(envelope, 12), endpoint_id);
             return new String(cipher.doFinal(Arrays.copyOfRange(envelope, 12, envelope.length)),
                     StandardCharsets.UTF_8);
         } catch (GeneralSecurityException | IllegalArgumentException ex) {
@@ -66,10 +66,10 @@ public class SecretEncryption {
         }
     }
 
-    private Cipher cipher(int mode, byte[] nonce, UUID endpointId) throws GeneralSecurityException {
+    private Cipher cipher(int mode, byte[] nonce, UUID endpoint_id) throws GeneralSecurityException {
         var cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(mode, key, new GCMParameterSpec(128, nonce));
-        cipher.updateAAD(endpointId.toString().getBytes(StandardCharsets.UTF_8));
+        cipher.updateAAD(endpoint_id.toString().getBytes(StandardCharsets.UTF_8));
         return cipher;
     }
 

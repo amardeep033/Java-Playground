@@ -145,11 +145,11 @@ public class Endpoint extends BaseEntity {
     protected Endpoint() {
     }
 
-    public Endpoint(UUID applicationId, String url, String description, Set<EventType> eventTypes) {
-        this.applicationId = applicationId;
+    public Endpoint(UUID app_id, String url, String description, Set<EventType> event_types) {
+        this.applicationId = app_id;
         this.url = url;
         this.description = description;
-        this.eventTypes = new HashSet<>(eventTypes);
+        this.eventTypes = new HashSet<>(event_types);
     }
 
 }

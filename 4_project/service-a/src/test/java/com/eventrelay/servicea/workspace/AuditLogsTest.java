@@ -29,6 +29,12 @@ class AuditLogsTest {
         assertThrows(IllegalArgumentException.class,()->audit.write(null,"endpoints",UUID.randomUUID(),"UPDATED",Map.of("config",Map.of("signingSecret","sensitive"))));
         verifyNoInteractions(db);
     }
+    @Test void rejectsCredentialsNestedInsideArraysBeforePersistence() {
+        assertThrows(IllegalArgumentException.class, () -> audit.writeClient(
+                UUID.randomUUID(), "endpoints", UUID.randomUUID(), "UPDATED",
+                Map.of("changes", List.of(Map.of("api_key", "sensitive")))));
+        verifyNoInteractions(db);
+    }
     @Test void unchangedMetadataDoesNotCreateAnAuditRecord() {
         audit.changed(null,"users",UUID.randomUUID(),"name","Alice","Alice");
         verifyNoInteractions(db);

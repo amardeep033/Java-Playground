@@ -1,0 +1,66 @@
+
+http is stateless - req2 doesnt know about req1 login
+so we validate each time or give something like key which we dont validate
+
+authn - password - who am i
+authz - token - what am i allowed to do
+
+stateful - session id - server checks each time - central store - easy logout or revocation
+stateless - token - info in token itself - scales well - theft and revocation needs care 
+
+browser - cookie - automatically - CSRF
+javascript - header - manual - XSS
+not in body -- as GET doesn't have
+
+XSS - hackers JS - inside our page (e.g. via unescaped user input) - token theft 
+CSRF - fake website - call our website - cookies auto attach - unwanted action 
+
+cookie Secure -- only over https
+cookie HttpOnly -- js cant read it -- but in your website directly call api and cookie auto attach
+cookie SameSite=Lax -- no cookie on cross site -- doesn’t cover vulnerable subdomain
+
+
+-------------------------
+
+user password + salt
+
+access token jwt
+jwt signing key
+refresh token(UI refreshes reactively on a 401)
+csrf token 
+
+customer api key
+
+endpoint signing secret
+signing secret enc key
+
+internal service token
+outbox claim token
+
+-------------------------
+
+
+get csrf token (not for GET -- also through cookie)
+use csrf token --- create a user + logs in --- Access JWT + refresh token are set as HttpOnly cookies
+subsequent requests --- csrf we send --- Browser automatically sends the access JWT cookie
+
+1. Why explicitly send CSRF in curl if it’s also a cookie?
+- Requiring the header prevents another website from submitting writes using only your browser’s automatically attached cookies.
+
+2. How does the browser know the JWT?
+- We do send it in the HTTP response, through a Set-Cookie header rather than JSON. The browser processes Set-Cookie, stores the cookies, and attaches them to matching subsequent requests. HttpOnly means JavaScript cannot read the cookie. The browser can still store and send it.
+
+-------------------------
+
+| Area | Current behavior / scaling implication |
+|---|---|
+| **JWT signing key** | All A instances must use the same `AUTH_JWT_KEY`; independently generated local keys would cause intermittent authentication failures. |
+| **Endpoint encryption key** | Use the same `SIGNING_SECRET_ENCRYPTION_KEY` wherever these endpoint secrets are encrypted/decrypted. |
+| **Internal service token** | A instances and B must agree on `SERVICE_INTERNAL_TOKEN`. |
+| **PostgreSQL / RabbitMQ** | All replicas must connect to the same logical database and broker topology. |
+| **Outbox claiming** | `SKIP LOCKED` and claim leases coordinate publishers across instances. Lease expiry can permit duplicate publishing. |
+| **JWT / refresh state** | JWT verification is stateless; refresh families are stored in shared PostgreSQL. No sticky sessions are needed for these. |
+| **Application lock** | Ingestion/replay for the **same `app_id` serialize** on its application row. More instances won’t remove that per-application bottleneck. |
+| **Reconciliation** | The shared cursor lock allows one reconciliation page at a time. Safe across replicas, but this work does not scale proportionally. |
+| **Shared infrastructure capacity** | More instances add database connections, queries, and broker consumers; PostgreSQL/RabbitMQ can become the bottleneck. |
+

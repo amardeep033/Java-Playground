@@ -19,8 +19,8 @@ public class AuthService {
     private final String dummy;
     private final int minutes;
     private final RefreshTokens refreshTokens;
-    public AuthService(JdbcTemplate db, PasswordEncoder passwords, @Value("${app.auth.token-minutes:15}") int minutes, RefreshTokens refreshTokens) {
-        this.refreshTokens = refreshTokens;
+    public AuthService(JdbcTemplate db, PasswordEncoder passwords, @Value("${app.auth.token-minutes:15}") int minutes, RefreshTokens refresh_tokens) {
+        this.refreshTokens = refresh_tokens;
         this.db = db; this.passwords = passwords; this.minutes = minutes;
         if (minutes < 1 || minutes > 60) throw new IllegalArgumentException("JWT lifetime must be 1–60 minutes");
         dummy = passwords.encode(UUID.randomUUID().toString());
@@ -54,11 +54,11 @@ public class AuthService {
         }
         db.update("UPDATE service_a.login_guards SET failures=0,window_started_at=now(),locked_until=NULL WHERE email_hash=?",hash);
         audit(account,hash,ip,"SUCCESS");
-        var user = new JwtUser(account.id(),account.role(),UUID.randomUUID(),now.plus(Duration.ofMinutes(minutes)));
-        return new LoginResult(user,200,null,0,refreshTokens.create(user));
+        var authenticated_user = new JwtUser(account.id(),account.role(),UUID.randomUUID(),now.plus(Duration.ofMinutes(minutes)));
+        return new LoginResult(authenticated_user,200,null,0,refreshTokens.create(authenticated_user));
     }
-    public List<Map<String,Object>> attempts(UUID user, String q) {
-        return db.queryForList("SELECT attempted_at,(reason='SUCCESS') AS success,reason,ip_address FROM service_a.login_attempts WHERE user_id=? AND (lower(reason) LIKE ? ESCAPE '!' OR lower(ip_address) LIKE ? ESCAPE '!') ORDER BY attempted_at DESC,id DESC LIMIT 20",user,ListSearch.pattern(q),ListSearch.pattern(q));
+    public List<Map<String,Object>> attempts(UUID user_id, String q) {
+        return db.queryForList("SELECT attempted_at,(reason='SUCCESS') AS success,reason,ip_address FROM service_a.login_attempts WHERE user_id=? AND (lower(reason) LIKE ? ESCAPE '!' OR lower(ip_address) LIKE ? ESCAPE '!') ORDER BY attempted_at DESC,id DESC LIMIT 20",user_id,ListSearch.pattern(q),ListSearch.pattern(q));
     }
     private void audit(Account user,String hash,String ip,String reason) {
         db.update("INSERT INTO service_a.login_attempts(id,user_id,email_hash,reason,ip_address) VALUES (?,?,?,?,?)",UUID.randomUUID(),user==null?null:user.id(),hash,reason,ip);

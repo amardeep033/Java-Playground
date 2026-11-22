@@ -39,5 +39,12 @@ public abstract class BaseEntity { //abstract over interface because it can prov
     }
 }
 
-// JpaRepository built-in methods like findById(), save(), and saveAndFlush() or Derived query like findByKeyHashAndRevokedAtIsNull(...) -- entity
-// JPQL @Query -- no entity for these -- directly hardcoded as in outbox.java
+// 1. With Hibernate (Spring Data JPA): requires @Entity - extends JpaRepository - (UserAccountRepository)
+// 1.1 Built-in        -- findById(), save(), deleteById()
+// 1.2 Derived         -- findByEmail(), findByNameAndStatus()
+// 1.3 @Query JPQL     -- @Query("SELECT u FROM UserAccount u") [Entity → SQL]
+// 1.4 @Query Native   -- @Query(value = "SELECT * FROM users", nativeQuery = true) [Direct SQL]
+
+// 2. Without Hibernate (Spring JDBC): no @Entity required - @Repository, JdbcTemplate, ObjectMapper - precise control needed (IncomingRequestStore)
+// 2.1 JdbcTemplate    -- db.query("SELECT * FROM users", rowMapper)
+// 2.2 JdbcTemplate    -- db.update("INSERT INTO users ...", params)

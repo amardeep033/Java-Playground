@@ -1,8 +1,5 @@
 package com.eventrelay.servicea;
 
-import com.eventrelay.servicea.common.config.RabbitMqConfig;
-import com.eventrelay.servicea.delivery.messaging.StatusListener;
-import com.eventrelay.servicea.delivery.outbox.Outbox;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 

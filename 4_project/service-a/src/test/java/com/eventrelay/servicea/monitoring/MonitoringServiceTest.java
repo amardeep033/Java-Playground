@@ -1,6 +1,10 @@
 package com.eventrelay.servicea.monitoring;
 
+import com.eventrelay.servicea.monitoring.dto.DeliverySummary;
+import com.eventrelay.servicea.monitoring.dto.ReplayReceipt;
+
 import com.eventrelay.servicea.apikey.ApiKeyService;
+import com.eventrelay.servicea.common.security.ApplicationAuthorization;
 import com.eventrelay.servicea.auth.access.ResourceAccess;
 import com.eventrelay.servicea.delivery.messaging.DeliveryCommand;
 import com.eventrelay.servicea.delivery.outbox.Outbox;
@@ -10,7 +14,6 @@ import com.eventrelay.servicea.endpoint.EndpointRepository;
 import com.eventrelay.servicea.delivery.persistence.DeliveryProjectionStore;
 import com.eventrelay.servicea.eventtype.EventType;
 import com.eventrelay.servicea.eventtype.EventTypeRepository;
-import com.eventrelay.servicea.monitoring.dto.MonitoringApi;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.*;
@@ -28,10 +31,10 @@ class MonitoringServiceTest {
     @Mock DeliveryProjectionStore deliveries; @Mock EndpointRepository endpoints; @Mock EventTypeRepository types; @Mock Outbox outbox;
     UUID app=UUID.randomUUID(),source=UUID.randomUUID(),event=UUID.randomUUID(),endpointId=UUID.randomUUID(),typeId=UUID.randomUUID();
     MonitoringService service;
-    @BeforeEach void setup(){ service=new MonitoringService(keys,access,store,deliveries,new EndpointDeliveryReader(endpoints),types,outbox); }
+    @BeforeEach void setup(){ service=new MonitoringService(new ApplicationAuthorization(keys, access),access,store,deliveries,new EndpointDeliveryReader(endpoints),types,outbox); }
     @Test void replayRetryReturnsTheOriginalReceiptWithoutPublishingAgain(){
         when(keys.authenticate("key")).thenReturn(app);
-        var receipt=new MonitoringApi.ReplayReceipt(UUID.randomUUID(),event,source,Instant.now());
+        var receipt=new ReplayReceipt(UUID.randomUUID(),event,source,Instant.now());
         when(store.replay(app,"request",source)).thenReturn(Optional.of(receipt));
         assertEquals(receipt,service.replay(app,source,"key","request"));
         verifyNoInteractions(deliveries,endpoints,types,outbox);
@@ -77,7 +80,7 @@ class MonitoringServiceTest {
         assertEquals(400,assertThrows(ResponseStatusException.class,()->service.replay(app,source,"key",null)).getStatusCode().value());
         verifyNoInteractions(store,outbox);
     }
-    private MonitoringApi.DeliverySummary delivery(boolean replay,String reason){
-        return new MonitoringApi.DeliverySummary(source,event,endpointId,"order.created","https://example.com/hook","DEAD",2,503,"HTTP 503",Instant.now(),Instant.now(),null,null,replay,reason);
+    private DeliverySummary delivery(boolean replay,String reason){
+        return new DeliverySummary(source,event,endpointId,"order.created","https://example.com/hook","DEAD",2,503,"HTTP 503",Instant.now(),Instant.now(),null,null,replay,reason);
     }
 }

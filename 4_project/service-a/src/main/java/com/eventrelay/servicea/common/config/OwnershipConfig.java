@@ -23,32 +23,32 @@ public class OwnershipConfig implements WebMvcConfigurer {
             public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
                 if (SecurityConfig.keyRequest(request))
                     return true; // Explicit keys are checked inside ingestion/monitoring.
-                JwtUser user = JwtUser.current();
-                if (user == null)
+                JwtUser authenticated_user = JwtUser.current();
+                if (authenticated_user == null)
                     return true;
                 var variables = (Map<?, ?>) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
                 if (variables == null)
                     return true;
                 String method = request.getMethod(), path = request.getRequestURI();
                 boolean read = method.equals("GET") || method.equals("HEAD");
-                if (variables.get("userId") instanceof String id && variables.get("clientId") == null) {
-                    UUID target = UUID.fromString(id);
-                    if (variables.get("applicationId") instanceof String appId) {
+                if (variables.get("userId") instanceof String user_id_text && variables.get("clientId") == null) {
+                    UUID target_user_id = UUID.fromString(user_id_text);
+                    if (variables.get("applicationId") instanceof String app_id_text) {
                         // The account prefix is navigation context; live client membership and app
                         // mappings decide access.
-                        access.member(UUID.fromString(appId));
+                        access.member(UUID.fromString(app_id_text));
                     } else
-                        access.account(target, false);
+                        access.account(target_user_id, false);
                 }
-                if (variables.get("clientId") instanceof String id) {
-                    access.clientRole(UUID.fromString(id));
+                if (variables.get("clientId") instanceof String client_id_text) {
+                    access.clientRole(UUID.fromString(client_id_text));
                 }
-                if (variables.get("applicationId") instanceof String id) {
-                    UUID app = UUID.fromString(id);
-                    access.member(app);
+                if (variables.get("applicationId") instanceof String app_id_text) {
+                    UUID app_id = UUID.fromString(app_id_text);
+                    access.member(app_id);
                     if (!read && (path.endsWith("/admin") || path.endsWith("/activation") || path.endsWith("/url")
                             || path.endsWith("/subscriptions") || method.equals("DELETE")))
-                        access.admin(app);
+                        access.admin(app_id);
                 }
                 return true;
             }

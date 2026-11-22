@@ -22,8 +22,8 @@ public class AuthController {
     private final RefreshTokens refreshTokens;
     private final JwtCookies cookies;
     private final UserService users;
-    public AuthController(AuthService auth,JwtCookies cookies,UserService users,RefreshTokens refreshTokens) {
-        this.refreshTokens=refreshTokens;this.auth=auth;this.cookies=cookies;this.users=users;
+    public AuthController(AuthService auth,JwtCookies cookies,UserService users,RefreshTokens refresh_tokens) {
+        this.refreshTokens=refresh_tokens;this.auth=auth;this.cookies=cookies;this.users=users;
     }
     public record Login(@NotBlank @Email @Size(max=320) String email,@NotBlank @Size(max=128) String password) { }
     public record Permissions(boolean manageUsers,boolean createApplications) { }
@@ -55,15 +55,15 @@ public class AuthController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(me(grant.user()));
     }
     @GetMapping("/me") public Me me() { return me(JwtUser.current()); }
-    private Me me(JwtUser user) {
+    private Me me(JwtUser authenticated_user) {
         UserResponse account;
-        try { account=users.getUser(user.id()); }
+        try { account=users.getUser(authenticated_user.id()); }
         catch(ResponseStatusException missing) {
             if(missing.getStatusCode().value()==404) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Please sign in again.");
             throw missing;
         }
         boolean admin="ADMIN".equals(account.role());
-        return new Me(account,account.role(),user.expiresAt(),new Permissions(admin,admin));
+        return new Me(account,account.role(),authenticated_user.expiresAt(),new Permissions(admin,admin));
     }
     @GetMapping("/login-attempts") public List<Map<String,Object>> attempts(@RequestParam(defaultValue="") String q) { return auth.attempts(JwtUser.current().id(),q); }
     @PostMapping("/logout") @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -1,6 +1,10 @@
 package com.eventrelay.servicea.event;
 
+import com.eventrelay.servicea.event.dto.EventAccepted;
+import com.eventrelay.servicea.event.dto.IngestRequest;
+
 import com.eventrelay.servicea.apikey.ApiKeyService;
+import com.eventrelay.servicea.common.security.ApplicationAuthorization;
 import com.eventrelay.servicea.application.Application;
 import com.eventrelay.servicea.auth.access.ResourceAccess;
 import com.eventrelay.servicea.delivery.messaging.DeliveryCommand;
@@ -9,7 +13,6 @@ import com.eventrelay.servicea.delivery.persistence.DeliveryProjectionStore;
 import com.eventrelay.servicea.endpoint.Endpoint;
 import com.eventrelay.servicea.endpoint.EndpointDeliveryReader;
 import com.eventrelay.servicea.endpoint.EndpointRepository;
-import com.eventrelay.servicea.event.dto.EventApi;
 import com.eventrelay.servicea.eventtype.EventType;
 import com.eventrelay.servicea.eventtype.EventTypeRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,21 +42,21 @@ class EventIngestionServiceTest {
     UUID appId = UUID.randomUUID();
     UUID typeId = UUID.randomUUID();
     EventIngestionService service;
-    @BeforeEach void setUp() { service = new EventIngestionService(keys, access, types, new EndpointDeliveryReader(endpoints), store, deliveries, outbox, mapper); }
+    @BeforeEach void setUp() { service = new EventIngestionService(new ApplicationAuthorization(keys, access), access, types, new EndpointDeliveryReader(endpoints), store, deliveries, outbox, mapper); }
 
     @Test void sameKeyAndReorderedJsonReturnOriginalReceiptWithoutPublishing() throws Exception {
         when(keys.authenticate("key")).thenReturn(appId);
         String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest("order.created\n{\"a\":1,\"b\":2}".getBytes(StandardCharsets.UTF_8)));
-        var receipt = new EventApi.Accepted(UUID.randomUUID(), "order.created", 1, Instant.now());
+        var receipt = new EventAccepted(UUID.randomUUID(), "order.created", 1, Instant.now());
         when(store.existing(appId, "same")).thenReturn(Optional.of(new EventStore.Stored(hash, receipt)));
-        assertEquals(receipt, service.receive(appId, "key", "same", new EventApi.IngestRequest("order.created", mapper.readTree("{\"b\":2,\"a\":1}"))));
+        assertEquals(receipt, service.receive(appId, "key", "same", new IngestRequest("order.created", mapper.readTree("{\"b\":2,\"a\":1}"))));
         verifyNoInteractions(outbox, types, endpoints);
     }
     @Test void keyReuseWithDifferentPayloadIsConflict() throws Exception {
         when(keys.authenticate("key")).thenReturn(appId);
-        when(store.existing(appId, "same")).thenReturn(Optional.of(new EventStore.Stored("different", new EventApi.Accepted(UUID.randomUUID(), "order.created", 1, Instant.now()))));
-        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", "same", new EventApi.IngestRequest("order.created", mapper.createObjectNode())));
+        when(store.existing(appId, "same")).thenReturn(Optional.of(new EventStore.Stored("different", new EventAccepted(UUID.randomUUID(), "order.created", 1, Instant.now()))));
+        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", "same", new IngestRequest("order.created", mapper.createObjectNode())));
         assertEquals(409, error.getStatusCode().value());
         verifyNoInteractions(outbox);
     }
@@ -67,7 +70,7 @@ class EventIngestionServiceTest {
         endpoint.rotateSigningSecret("encrypted");
         endpoint.configure(true, 25, 2, 9000, 3);
         when(endpoints.findSubscribed(appId, typeId)).thenReturn(List.of(endpoint));
-        var receipt = service.receive(appId, "key", "new", new EventApi.IngestRequest("order.created", mapper.createObjectNode().put("orderId", "123")));
+        var receipt = service.receive(appId, "key", "new", new IngestRequest("order.created", mapper.createObjectNode().put("orderId", "123")));
         assertEquals(1, receipt.deliveryCount());
         var command = ArgumentCaptor.forClass(DeliveryCommand.class);
         verify(outbox).enqueue(any(), any(), eq("event-relay.delivery"), eq("delivery.requested"), command.capture());
@@ -84,20 +87,20 @@ class EventIngestionServiceTest {
         var type = type();
         when(types.findByApplicationIdAndName(appId, "order.created")).thenReturn(Optional.of(type));
         when(endpoints.findSubscribed(appId, typeId)).thenReturn(List.of(new Endpoint(appId, "https://example.com", null, Set.of(type))));
-        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", "new", new EventApi.IngestRequest("order.created", mapper.createObjectNode())));
+        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", "new", new IngestRequest("order.created", mapper.createObjectNode())));
         assertEquals(409, error.getStatusCode().value());
         verify(store, never()).save(any(), any(), any(), any(), any(), any(), any(), anyInt(), any());
         verifyNoInteractions(outbox);
     }
     @Test void anotherApplicationsKeyCannotPublish() {
         when(keys.authenticate("key")).thenReturn(UUID.randomUUID());
-        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", "new", new EventApi.IngestRequest("order.created", mapper.createObjectNode())));
+        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", "new", new IngestRequest("order.created", mapper.createObjectNode())));
         assertEquals(403, error.getStatusCode().value());
         verifyNoInteractions(store, outbox, access);
     }
     @Test void missingIdempotencyKeyIsRejected() {
         when(keys.authenticate("key")).thenReturn(appId);
-        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", null, new EventApi.IngestRequest("order.created", mapper.createObjectNode())));
+        var error = assertThrows(ResponseStatusException.class, () -> service.receive(appId, "key", null, new IngestRequest("order.created", mapper.createObjectNode())));
         assertEquals(400, error.getStatusCode().value());
         verifyNoInteractions(store, outbox);
     }

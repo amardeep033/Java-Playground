@@ -7,6 +7,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StatusUpdateService {
     private final DeliveryProjectionStore store;
-    public StatusUpdateService(DeliveryProjectionStore store) { this.store = store; }
-    @Transactional public void apply(DeliveryStatusMessage message) { message.validate(); store.applyStatus(message); }
+
+    public StatusUpdateService(DeliveryProjectionStore store) {
+        this.store = store;
+    }
+
+    @Transactional
+    public void apply(DeliveryStatusMessage message) {
+        // DB write5 and DB write6 -- only one complete delivery at a time with all its attempts
+        store.applyStatus(message);
+    }
 }

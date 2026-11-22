@@ -68,8 +68,8 @@ public class Application extends BaseEntity {
         return clientId;
     }
 
-    public void assignClient(UUID id) {
-        clientId = id;
+    public void assignClient(UUID client_id) {
+        clientId = client_id;
     }
 
     //----------------------------------------------------
@@ -77,8 +77,8 @@ public class Application extends BaseEntity {
     protected Application() {
     }
 
-    public Application(UUID userId, String name) {
-        this.userId = userId;
+    public Application(UUID user_id, String name) {
+        this.userId = user_id;
         this.name = name;
     }
 }

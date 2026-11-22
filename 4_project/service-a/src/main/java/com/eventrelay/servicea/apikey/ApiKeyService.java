@@ -32,14 +32,14 @@ public class ApiKeyService {
     }
 
     @Transactional
-    public IssuedApiKey create(UUID applicationId, String name) {
-        access.lockedApplication(applicationId);
-        return issue(applicationId, name.strip());
+    public IssuedApiKey create(UUID app_id, String name) {
+        access.lockedApplication(app_id);
+        return issue(app_id, name.strip());
     }
 
-    public PageResult<ApiKeyDetails> list(UUID appId, String q, String status, Pageable page) {
-        requireApplication(appId);
-        var spec = ListSearch.<ApiKey>scoped("applicationId", appId, q, "name", "keyPrefix");
+    public PageResult<ApiKeyDetails> list(UUID app_id, String q, String status, Pageable page) {
+        requireApplication(app_id);
+        var spec = ListSearch.<ApiKey>scoped("applicationId", app_id, q, "name", "keyPrefix");
         var selected = ListSearch.choices(status, Set.of("ACTIVE", "REVOKED"));
         if (selected.size() == 1)
             spec = spec.and((root, query, cb) -> selected.getFirst().equals("ACTIVE") ? cb.isNull(root.get("revokedAt"))
@@ -48,79 +48,79 @@ public class ApiKeyService {
     }
 
     @Transactional
-    public ApiKeyDetails update(UUID appId, UUID keyId, UpdateName request) {
-        access.lockedApplication(appId);
-        var key = lockedKey(appId, keyId);
-        audit.changed(appId, "api_keys", keyId, "name", key.getName(), request.name().strip());
-        key.updateName(request.name().strip());
-        return ApiKeyDetails.from(key);
+    public ApiKeyDetails update(UUID app_id, UUID api_key_id, UpdateName request) {
+        access.lockedApplication(app_id);
+        var api_key_record = lockedKey(app_id, api_key_id);
+        audit.changed(app_id, "api_keys", api_key_id, "name", api_key_record.getName(), request.name().strip());
+        api_key_record.updateName(request.name().strip());
+        return ApiKeyDetails.from(api_key_record);
     }
 
-    public ApiKeyDetails get(UUID applicationId, UUID keyId) {
-        requireApplication(applicationId);
-        return ApiKeyDetails.from(keys.findByIdAndApplicationId(keyId, applicationId)
+    public ApiKeyDetails get(UUID app_id, UUID api_key_id) {
+        requireApplication(app_id);
+        return ApiKeyDetails.from(keys.findByIdAndApplicationId(api_key_id, app_id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "API key not found")));
     }
 
     @Transactional
-    public IssuedApiKey rotate(UUID applicationId, UUID keyId) {
-        access.lockedApplication(applicationId);
-        var oldKey = lockedKey(applicationId, keyId);
-        if (oldKey.getRevokedAt() != null) {
+    public IssuedApiKey rotate(UUID app_id, UUID api_key_id) {
+        access.lockedApplication(app_id);
+        var old_key = lockedKey(app_id, api_key_id);
+        if (old_key.getRevokedAt() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Revoked API keys cannot be rotated");
         }
-        var replacement = issue(applicationId, oldKey.getName());
-        oldKey.replaceWith(replacement.key().id());
+        var replacement = issue(app_id, old_key.getName());
+        old_key.replaceWith(replacement.key().id());
         return replacement;
     }
 
     @Transactional
-    public void revoke(UUID applicationId, UUID keyId) {
-        access.lockedApplication(applicationId);
-        lockedKey(applicationId, keyId).revoke();
+    public void revoke(UUID app_id, UUID api_key_id) {
+        access.lockedApplication(app_id);
+        lockedKey(app_id, api_key_id).revoke();
     }
 
     // Authentication boundary for ingestion and event-status reads.
-    public UUID authenticate(String secret) {
-        if (secret == null || !secret.matches("er_[A-Za-z0-9_-]{43}")) {
+    public UUID authenticate(String api_key) {
+        if (api_key == null || !api_key.matches("er_[A-Za-z0-9_-]{43}")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid API key");
         }
         // Only unrevoked key hashes authenticate. Revocation takes effect on the
         // next API-key request; it neither invalidates dashboard JWTs nor cancels
         // queued deliveries.
-        UUID appId = keys.findByKeyHashAndRevokedAtIsNull(hash(secret)).map(ApiKey::getApplicationId)
+        UUID app_id = keys.findByKeyHashAndRevokedAtIsNull(hash(api_key)).map(ApiKey::getApplicationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid API key"));
         try {
-            access.application(appId);
+            access.application(app_id);
         } catch (ResponseStatusException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid API key");
         }
-        return appId;
+        return app_id;
     }
 
-    private IssuedApiKey issue(UUID applicationId, String name) {
+    private IssuedApiKey issue(UUID app_id, String name) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
-        String secret = "er_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        var key = new ApiKey(applicationId, name, hash(secret), secret.substring(0, 11));
-        return new IssuedApiKey(ApiKeyDetails.from(keys.saveAndFlush(key)), secret);
+        String api_key = "er_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        var api_key_record = new ApiKey(app_id, name, hash(api_key), api_key.substring(0, 11));
+        return new IssuedApiKey(ApiKeyDetails.from(keys.saveAndFlush(api_key_record)), api_key);
     }
 
-    private static String hash(String secret) {
+    private static String hash(String api_key) {
         try {
             return HexFormat.of()
-                    .formatHex(MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8)));
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(api_key.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 unavailable", ex);
         }
     }
 
-    private ApiKey lockedKey(UUID applicationId, UUID keyId) {
-        return keys.findForUpdate(keyId, applicationId)
+    private ApiKey lockedKey(UUID app_id, UUID api_key_id) {
+        return keys.findForUpdate(api_key_id, app_id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "API key not found"));
     }
 
-    private void requireApplication(UUID applicationId) {
-        access.application(applicationId);
+    private void requireApplication(UUID app_id) {
+        access.application(app_id);
     }
 }

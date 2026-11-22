@@ -30,49 +30,49 @@ public class EndpointController {
     //------------------------------------------------
 
     @PostMapping("")
-    public ResponseEntity<IssuedEndpoint> register(@PathVariable UUID applicationId,
+    public ResponseEntity<IssuedEndpoint> register(@PathVariable("applicationId") UUID app_id,
             @Valid @RequestBody RegisterEndpoint request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .cacheControl(CacheControl.noStore())
-                .body(service.registerEndpoint(applicationId, request));
+                .body(service.registerEndpoint(app_id, request));
     }
 
     @GetMapping("")
-    public PageResult<WebhookEndpoint> list(@PathVariable UUID applicationId,
+    public PageResult<WebhookEndpoint> list(@PathVariable("applicationId") UUID app_id,
             @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "") String status,
             @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.listEndpoints(applicationId, q, status, pageable);
+        return service.listEndpoints(app_id, q, status, pageable);
     }
 
     @GetMapping("/{endpointId}")
-    public WebhookEndpoint get(@PathVariable UUID applicationId, @PathVariable UUID endpointId) {
-        return service.getEndpoint(applicationId, endpointId);
+    public WebhookEndpoint get(@PathVariable("applicationId") UUID app_id, @PathVariable("endpointId") UUID endpoint_id) {
+        return service.getEndpoint(app_id, endpoint_id);
     }
 
     @PutMapping("/{endpointId}")
-    public WebhookEndpoint update(@PathVariable UUID applicationId, @PathVariable UUID endpointId,
+    public WebhookEndpoint update(@PathVariable("applicationId") UUID app_id, @PathVariable("endpointId") UUID endpoint_id,
             @Valid @RequestBody UpdateEndpoint request) {
-        return service.updateEndpoint(applicationId, endpointId, request);
+        return service.updateEndpoint(app_id, endpoint_id, request);
     }
 
     @DeleteMapping("/{endpointId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID applicationId, @PathVariable UUID endpointId) {
-        service.deleteEndpoint(applicationId, endpointId);
+    public void delete(@PathVariable("applicationId") UUID app_id, @PathVariable("endpointId") UUID endpoint_id) {
+        service.deleteEndpoint(app_id, endpoint_id);
     }
 
     @PutMapping("/{endpointId}/admin")
-    public WebhookEndpoint admin(@PathVariable UUID applicationId, @PathVariable UUID endpointId,
+    public WebhookEndpoint admin(@PathVariable("applicationId") UUID app_id, @PathVariable("endpointId") UUID endpoint_id,
             @Valid @RequestBody AdminEndpointUpdate request) {
-        return service.adminEndpointUpdate(applicationId, endpointId, request);
+        return service.adminEndpointUpdate(app_id, endpoint_id, request);
     }
 
     @PostMapping("/{endpointId}/signing-secret/rotate")
     public ResponseEntity<IssuedEndpoint> rotateSigningSecret(
-            @PathVariable UUID applicationId, @PathVariable UUID endpointId) {
+            @PathVariable("applicationId") UUID app_id, @PathVariable("endpointId") UUID endpoint_id) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .cacheControl(CacheControl.noStore())
-                .body(service.rotateSigningSecret(applicationId, endpointId));
+                .body(service.rotateSigningSecret(app_id, endpoint_id));
     }
 
 }

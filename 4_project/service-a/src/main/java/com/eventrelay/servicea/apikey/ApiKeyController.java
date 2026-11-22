@@ -28,40 +28,40 @@ public class ApiKeyController {
     //------------------------------------------------
 
     @PostMapping
-    public ResponseEntity<IssuedApiKey> create(@PathVariable UUID applicationId,
+    public ResponseEntity<IssuedApiKey> create(@PathVariable("applicationId") UUID app_id,
             @Valid @RequestBody CreateApiKey request) {
         return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
-                .body(service.create(applicationId, request.name()));
+                .body(service.create(app_id, request.name()));
     }
 
     @GetMapping
-    public PageResult<ApiKeyDetails> list(@PathVariable UUID applicationId,
+    public PageResult<ApiKeyDetails> list(@PathVariable("applicationId") UUID app_id,
             @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "") String status,
             @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.list(applicationId, q, status, pageable);
+        return service.list(app_id, q, status, pageable);
     }
 
     @GetMapping("/{keyId}")
-    public ApiKeyDetails get(@PathVariable UUID applicationId, @PathVariable UUID keyId) {
-        return service.get(applicationId, keyId);
+    public ApiKeyDetails get(@PathVariable("applicationId") UUID app_id, @PathVariable("keyId") UUID api_key_id) {
+        return service.get(app_id, api_key_id);
     }
 
     @PutMapping("/{keyId}")
-    public ApiKeyDetails update(@PathVariable UUID applicationId, @PathVariable UUID keyId,
+    public ApiKeyDetails update(@PathVariable("applicationId") UUID app_id, @PathVariable("keyId") UUID api_key_id,
             @Valid @RequestBody UpdateName request) {
-        return service.update(applicationId, keyId, request);
+        return service.update(app_id, api_key_id, request);
     }
 
     @DeleteMapping("/{keyId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void revoke(@PathVariable UUID applicationId, @PathVariable UUID keyId) {
-        service.revoke(applicationId, keyId);
+    public void revoke(@PathVariable("applicationId") UUID app_id, @PathVariable("keyId") UUID api_key_id) {
+        service.revoke(app_id, api_key_id);
     }
 
     @PostMapping("/{keyId}/rotate")
-    public ResponseEntity<IssuedApiKey> rotate(@PathVariable UUID applicationId, @PathVariable UUID keyId) {
+    public ResponseEntity<IssuedApiKey> rotate(@PathVariable("applicationId") UUID app_id, @PathVariable("keyId") UUID api_key_id) {
         return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
-                .body(service.rotate(applicationId, keyId));
+                .body(service.rotate(app_id, api_key_id));
     }
 
 }

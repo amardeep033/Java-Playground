@@ -61,8 +61,8 @@ public class EventType extends BaseEntity {
     protected EventType() {
     }
 
-    public EventType(UUID applicationId, String name, String description) {
-        this.applicationId = applicationId;
+    public EventType(UUID app_id, String name, String description) {
+        this.applicationId = app_id;
         this.name = name;
         this.description = description;
     }

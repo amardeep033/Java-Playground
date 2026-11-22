@@ -20,21 +20,21 @@ public class WorkspaceService {
         this.db=db;this.permissions=permissions;this.resources=resources;this.audit=audit;
     }
     @Transactional
-    public void setMember(UUID app,UUID user) {
-        var application=resources.lockedApplication(app);permissions.admin(app);resources.user(user);
-        requireClientUser(application.getClientId(),user);
-        int changed=db.update("INSERT INTO service_a.workspace_members(id,application_id,user_id,client_id) VALUES (?,?,?,?) ON CONFLICT(application_id,user_id) DO UPDATE SET deleted_at=NULL WHERE workspace_members.deleted_at IS NOT NULL",UUID.randomUUID(),app,user,application.getClientId());
-        if(changed>0) audit.changed(app,"workspace_members",user,"mapped",false,true);
+    public void setMember(UUID app_id,UUID user_id) {
+        var application=resources.lockedApplication(app_id);permissions.admin(app_id);resources.user(user_id);
+        requireClientUser(application.getClientId(),user_id);
+        int changed=db.update("INSERT INTO service_a.workspace_members(id,application_id,user_id,client_id) VALUES (?,?,?,?) ON CONFLICT(application_id,user_id) DO UPDATE SET deleted_at=NULL WHERE workspace_members.deleted_at IS NOT NULL",UUID.randomUUID(),app_id,user_id,application.getClientId());
+        if(changed>0) audit.changed(app_id,"workspace_members",user_id,"mapped",false,true);
     }
     @Transactional
-    public void removeMember(UUID app,UUID user) {
-        var application=resources.lockedApplication(app);permissions.admin(app);
-        requireClientUser(application.getClientId(),user);
-        int changed=db.update("UPDATE service_a.workspace_members SET deleted_at=now() WHERE application_id=? AND user_id=? AND deleted_at IS NULL",app,user);
-        if(changed>0) audit.changed(app,"workspace_members",user,"mapped",true,false);
+    public void removeMember(UUID app_id,UUID user_id) {
+        var application=resources.lockedApplication(app_id);permissions.admin(app_id);
+        requireClientUser(application.getClientId(),user_id);
+        int changed=db.update("UPDATE service_a.workspace_members SET deleted_at=now() WHERE application_id=? AND user_id=? AND deleted_at IS NULL",app_id,user_id);
+        if(changed>0) audit.changed(app_id,"workspace_members",user_id,"mapped",true,false);
     }
-    private void requireClientUser(UUID client,UUID user) {
-        var roles=db.queryForList("SELECT role FROM service_a.users WHERE client_id=? AND id=? AND deleted_at IS NULL",String.class,client,user);
+    private void requireClientUser(UUID client_id,UUID user_id) {
+        var roles=db.queryForList("SELECT role FROM service_a.users WHERE client_id=? AND id=? AND deleted_at IS NULL",String.class,client_id,user_id);
         if(roles.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"User must belong to the application's client");
         if(!roles.getFirst().equals("USER")) throw new ResponseStatusException(HttpStatus.CONFLICT,"Client ADMIN already has every application; no mapping is needed");
     }

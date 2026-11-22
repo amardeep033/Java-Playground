@@ -12,24 +12,38 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+// S3: intercept and check jwt
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
     private final JwtTokens tokens;
-    public JwtAuthenticationFilter(JwtTokens tokens) { this.tokens=tokens; }
+
+    public JwtAuthenticationFilter(JwtTokens tokens) {
+        this.tokens=tokens; 
+    }
+
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
-        // Explicit API-key requests authenticate in the ingestion/monitoring service.
-        // A bad API key must never borrow a valid dashboard JWT cookie.
+
+        // check the JWT cookie only when the request is neither an API-key request nor a public authentication request(get csrf, sign up, login, refresh, logout)
         if (!SecurityConfig.keyRequest(request) && !SecurityConfig.publicAuth(request)) {
+
             String value=null;
-            if(request.getCookies()!=null) for(Cookie cookie:request.getCookies()) {
-                if(JwtCookies.NAME.equals(cookie.getName())) { value=cookie.getValue();break; }
+
+            //protects from null pointer exception
+            if(request.getCookies()!=null) {
+                for(Cookie cookie:request.getCookies()) {
+                    if(JwtCookies.NAME.equals(cookie.getName())) { 
+                        value=cookie.getValue();
+                        break; 
+                    }
+                }
             }
+                
             if(value!=null) {
                 try {
-                    // Stateless verification: signed claims only. No DB session, blacklist,
-                    // or user lookup. Business authorization still checks live client roles and app mappings.
-                    var user=tokens.authenticate(value);
+                    // calls and authenticate and get User(id, role, tokenid, expires at)
+                    var authenticated_user=tokens.authenticate(value);
                     SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                            user,null,List.of(new SimpleGrantedAuthority("ROLE_"+user.role()))));
+                            authenticated_user,null,List.of(new SimpleGrantedAuthority("ROLE_"+authenticated_user.role()))));
                 } catch (JwtException | IllegalArgumentException invalid) {
                     IncomingRequestContext.reason(request,IncomingRequestContext.Reason.INVALID_JWT);
                     response.setHeader("WWW-Authenticate","Bearer error=\"invalid_token\"");

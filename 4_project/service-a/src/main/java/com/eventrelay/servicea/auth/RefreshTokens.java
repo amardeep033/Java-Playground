@@ -30,12 +30,12 @@ public class RefreshTokens {
 
     // Called inside the password-verified login transaction, which already locks the user.
     @Transactional
-    public Grant create(JwtUser user) {
+    public Grant create(JwtUser authenticated_user) {
         UUID family = UUID.randomUUID();
         Instant expires = db.queryForObject("SELECT now() + (? * interval '1 day')", (r,n) -> r.getTimestamp(1).toInstant(), days);
         db.update("INSERT INTO service_a.refresh_token_families(id,user_id,expires_at) VALUES (?,?,?)",
-                family, user.id(), Timestamp.from(expires));
-        return insert(user, family, expires);
+                family, authenticated_user.id(), Timestamp.from(expires));
+        return insert(authenticated_user, family, expires);
     }
     @Transactional
     public Grant rotate(String raw) {
@@ -58,10 +58,10 @@ public class RefreshTokens {
             revoke(token.familyId(), "REUSE_DETECTED");
             return null;
         }
-        Instant accessExpiry = now.plus(Duration.ofMinutes(minutes));
-        if (accessExpiry.isAfter(family.expiresAt())) accessExpiry = family.expiresAt();
-        var user = new JwtUser(family.userId(), roles.getFirst(), UUID.randomUUID(), accessExpiry);
-        Grant next = insert(user,token.familyId(),family.expiresAt());
+        Instant access_expiry = now.plus(Duration.ofMinutes(minutes));
+        if (access_expiry.isAfter(family.expiresAt())) access_expiry = family.expiresAt();
+        var authenticated_user = new JwtUser(family.userId(), roles.getFirst(), UUID.randomUUID(), access_expiry);
+        Grant next = insert(authenticated_user,token.familyId(),family.expiresAt());
         db.update("UPDATE service_a.refresh_tokens SET used_at=now() WHERE id=?",token.id());
         return next;
     }
@@ -79,11 +79,11 @@ public class RefreshTokens {
                 (r,n) -> new Token(r.getObject(1,UUID.class),r.getObject(2,UUID.class)),hash(raw));
         return found.isEmpty() ? null : found.getFirst();
     }
-    private Grant insert(JwtUser user, UUID family, Instant expires) {
+    private Grant insert(JwtUser authenticated_user, UUID family, Instant expires) {
         byte[] bytes = new byte[32]; random.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         db.update("INSERT INTO service_a.refresh_tokens(id,family_id,token_hash) VALUES (?,?,?)",UUID.randomUUID(),family,hash(raw));
-        return new Grant(user,raw,expires);
+        return new Grant(authenticated_user,raw,expires);
     }
     private static String hash(String raw) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8))); }

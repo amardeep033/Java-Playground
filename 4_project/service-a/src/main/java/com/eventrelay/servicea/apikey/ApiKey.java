@@ -63,9 +63,9 @@ public class ApiKey extends BaseEntity {
         return replacedById;
     }
 
-    public void replaceWith(UUID replacementId) {
+    public void replaceWith(UUID replacement_id) {
         revoke();
-        replacedById = replacementId;
+        replacedById = replacement_id;
     }
 
     //----------------------------------------------------------
@@ -82,11 +82,11 @@ public class ApiKey extends BaseEntity {
     protected ApiKey() {
     }
 
-    public ApiKey(UUID applicationId, String name, String keyHash, String keyPrefix) {
-        this.applicationId = applicationId;
+    public ApiKey(UUID app_id, String name, String key_hash, String key_prefix) {
+        this.applicationId = app_id;
         this.name = name;
-        this.keyHash = keyHash;
-        this.keyPrefix = keyPrefix;
+        this.keyHash = key_hash;
+        this.keyPrefix = key_prefix;
     }
 
 }

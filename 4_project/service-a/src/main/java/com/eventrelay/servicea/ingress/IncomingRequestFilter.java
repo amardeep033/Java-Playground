@@ -1,5 +1,6 @@
 package com.eventrelay.servicea.ingress;
 
+import com.eventrelay.servicea.ingress.IncomingRequestContext.Reason;
 import com.eventrelay.servicea.ingress.dto.IncomingRequestEntry;
 
 import com.eventrelay.servicea.auth.JwtCookies;
@@ -18,53 +19,92 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import static com.eventrelay.servicea.ingress.IncomingRequestContext.*;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE+20)
+@Order(Ordered.HIGHEST_PRECEDENCE + 20) //so that it comes before SecurityCheckFilter(auto called before controller - config is only for startup)
 public class IncomingRequestFilter extends OncePerRequestFilter {
-    private static final Pattern PATH=Pattern.compile("/api/v1/applications/([^/]+)/events/?");
-    private static final Logger LOG=LoggerFactory.getLogger(IncomingRequestFilter.class);
+
+    private static final Pattern PATH = Pattern.compile("/api/v1/applications/([^/]+)/events/?");
+    private static final Logger LOG = LoggerFactory.getLogger(IncomingRequestFilter.class);
     private final IncomingRequestStore store;
-    public IncomingRequestFilter(IncomingRequestStore store) { this.store=store; }
-    @Override protected boolean shouldNotFilter(HttpServletRequest request) {
+
+    public IncomingRequestFilter(IncomingRequestStore store) {
+        this.store = store;
+    }
+
+    //-------------------------------------------------------
+
+    //skips the entire filter 
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
         return !request.getMethod().equals("POST") || !PATH.matcher(request.getRequestURI()).matches();
     }
-    @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
-        var path=PATH.matcher(request.getRequestURI());path.matches();
-        String target=path.group(1);
-        // Invalid path segments may contain arbitrary text; never persist them as metadata.
-        if(!target.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) target="INVALID_APPLICATION_ID";
-        UUID id=UUID.randomUUID();Instant received=Instant.now();long started=System.nanoTime();
-        request.setAttribute(ID,id);
-        response.setHeader("X-Request-Id",id.toString());boolean failed=true;
-        String key=request.getHeader("Idempotency-Key");boolean hasKey=key!=null&&!key.isBlank();
-        String auth=request.getHeader("X-API-Key")!=null?"API_KEY":hasCookie(request)?"DASHBOARD":"NONE";
-        try {
-            // Commit the parent audit row before event ingestion can reference it.
-            store.begin(new IncomingRequestEntry(id,null,target,received,0,102,"PROCESSING",Reason.PROCESSING.name(),Reason.PROCESSING.message,
-                    null,null,auth,hasKey,request.getRemoteAddr(),List.of(),null,null,null),request.getHeader("X-API-Key"));
-        } catch(RuntimeException unavailable) {
-            LOG.warn("Unable to initialize incoming request audit ({})",unavailable.getClass().getSimpleName());
-            response.setStatus(503);response.setContentType("application/problem+json");
-            response.getWriter().write("{\"status\":503,\"detail\":\"Unable to record request; please retry later\"}");return;
+
+    //called if shouldFilter applies
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+
+        //use regex - get target app id
+        var path = PATH.matcher(request.getRequestURI());
+        path.matches();
+        String requested_app_id = path.group(1);
+        if (!requested_app_id.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
+            requested_app_id = "INVALID_APPLICATION_ID";
         }
-        try { chain.doFilter(request,response);failed=false; }
-        finally {
-            int status=failed?500:response.getStatus();
-            String outcome=status>=500?"ERROR":status>=200&&status<300?"ACCEPTED":"REJECTED";
-            Reason reason=failed?Reason.SERVER_ERROR:request.getAttribute(REASON) instanceof Reason r?r:fallback(status);
-            UUID event=outcome.equals("ACCEPTED") && request.getAttribute(EVENT) instanceof UUID value?value:null;
+            
+        UUID request_id = UUID.randomUUID();
+        Instant received = Instant.now();
+        long started = System.nanoTime();
+        request.setAttribute(ID, request_id);
+        response.setHeader("X-Request-Id", request_id.toString());
+        boolean failed = true;
+        String idempotency_key = request.getHeader("Idempotency-Key");
+        boolean has_key = idempotency_key != null && !idempotency_key.isBlank();
+        //`DASHBOARD`, `API_KEY`, `NONE`
+        String auth = request.getHeader("X-API-Key") != null ? "API_KEY" : hasCookie(request) ? "DASHBOARD" : "NONE";
+
+        // Create the initial audit record before request processing; return 503 if audit storage fails.
+        try {
+
+            // DB write1: incoming_requests
+            store.begin(
+                    new IncomingRequestEntry(request_id, null, requested_app_id, received, 0, 102, "PROCESSING", Reason.PROCESSING.name(),
+                            Reason.PROCESSING.message,
+                            null, null, auth, has_key, request.getRemoteAddr(), List.of(), null, null, null),
+                    request.getHeader("X-API-Key"));
+        } catch (RuntimeException unavailable) {
+            LOG.warn("Unable to initialize incoming request audit ({})", unavailable.getClass().getSimpleName());
+            response.setStatus(503);
+            response.setContentType("application/problem+json");
+            response.getWriter().write("{\"status\":503,\"detail\":\"Unable to record request; please retry later\"}");
+            return;
+        }
+
+
+        // Continue through security filters and controller, then record the final request outcome in finally.
+        try {
+            chain.doFilter(request, response);
+            failed = false;
+        } finally { //coming back to update the final status
+            int status = failed ? 500 : response.getStatus();
+            String outcome = status >= 500 ? "ERROR" : status >= 200 && status < 300 ? "ACCEPTED" : "REJECTED";
+            Reason reason = failed ? Reason.SERVER_ERROR
+                    : request.getAttribute(REASON) instanceof Reason r ? r : fallback(status);
+            UUID event = outcome.equals("ACCEPTED") && request.getAttribute(EVENT) instanceof UUID value ? value : null;
             @SuppressWarnings("unchecked")
-            List<UUID> skipped=request.getAttribute(SKIPPED) instanceof List<?> values?(List<UUID>)values:List.of();
+            List<UUID> skipped = request.getAttribute(SKIPPED) instanceof List<?> values ? (List<UUID>) values
+                    : List.of();
             try {
-                // Store bounded metadata only; never cache bodies or persist credential/header values.
-                store.append(new IncomingRequestEntry(id,null,target,received,(System.nanoTime()-started)/1_000_000,status,outcome,
-                        reason.name(),reason.message,event,(String)request.getAttribute(TYPE),auth,hasKey,request.getRemoteAddr(),skipped,null,null,(UUID)request.getAttribute(DUPLICATE)));
-            } catch(RuntimeException unavailable) {
-                // An audit DB failure must not turn an already committed event into a false rejection.
-                LOG.warn("Unable to persist incoming request audit ({})",unavailable.getClass().getSimpleName());
+                store.append(new IncomingRequestEntry(request_id, null, requested_app_id, received,
+                        (System.nanoTime() - started) / 1_000_000, status, outcome,
+                        reason.name(), reason.message, event, (String) request.getAttribute(TYPE), auth, has_key,
+                        request.getRemoteAddr(), skipped, null, null, (UUID) request.getAttribute(DUPLICATE)));
+            } catch (RuntimeException unavailable) {
+                LOG.warn("Unable to persist incoming request audit ({})", unavailable.getClass().getSimpleName());
             }
         }
     }
+
     private boolean hasCookie(HttpServletRequest request) {
-        return request.getCookies()!=null && Arrays.stream(request.getCookies()).anyMatch(c->c.getName().equals(JwtCookies.NAME));
+        return request.getCookies() != null && Arrays.stream(request.getCookies()).anyMatch(c -> c.getName().equals(JwtCookies.NAME));
     }
 }

@@ -32,10 +32,10 @@ public final class ListSearch {
         return "%" + text(q).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 
-    public static <T> Specification<T> scoped(String ownerField, UUID owner, String q, String... fields) {
+    public static <T> Specification<T> scoped(String owner_field, UUID owner, String q, String... fields) {
         String search = text(q);
         return (root, query, cb) -> {
-            var scope = cb.equal(root.get(ownerField), owner);
+            var scope = cb.equal(root.get(owner_field), owner);
             if (search.isEmpty())
                 return scope;
             var matches = new ArrayList<Predicate>();

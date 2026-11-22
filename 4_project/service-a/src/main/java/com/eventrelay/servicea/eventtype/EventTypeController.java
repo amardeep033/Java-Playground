@@ -28,38 +28,38 @@ public class EventTypeController {
 
     @PostMapping("")
     @ResponseStatus(HttpStatus.CREATED)
-    public EventTypeResponse register(@PathVariable UUID applicationId, @Valid @RequestBody RegisterEventType request) {
-        return service.registerEventType(applicationId, request);
+    public EventTypeResponse register(@PathVariable("applicationId") UUID app_id, @Valid @RequestBody RegisterEventType request) {
+        return service.registerEventType(app_id, request);
     }
 
     @GetMapping("")
-    public PageResult<EventTypeResponse> list(@PathVariable UUID applicationId,
+    public PageResult<EventTypeResponse> list(@PathVariable("applicationId") UUID app_id,
             @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "") String status,
             @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.listEventTypes(applicationId, q, status, pageable);
+        return service.listEventTypes(app_id, q, status, pageable);
     }
 
     @GetMapping("/{eventTypeId}")
-    public EventTypeResponse get(@PathVariable UUID applicationId, @PathVariable UUID eventTypeId) {
-        return service.getEventType(applicationId, eventTypeId);
+    public EventTypeResponse get(@PathVariable("applicationId") UUID app_id, @PathVariable("eventTypeId") UUID event_type_id) {
+        return service.getEventType(app_id, event_type_id);
     }
 
     @PutMapping("/{eventTypeId}")
-    public EventTypeResponse update(@PathVariable UUID applicationId, @PathVariable UUID eventTypeId,
+    public EventTypeResponse update(@PathVariable("applicationId") UUID app_id, @PathVariable("eventTypeId") UUID event_type_id,
             @Valid @RequestBody UpdateDescription request) {
-        return service.updateEventType(applicationId, eventTypeId, request);
+        return service.updateEventType(app_id, event_type_id, request);
     }
 
     @PutMapping("/{eventTypeId}/activation")
-    public EventTypeResponse activation(@PathVariable UUID applicationId, @PathVariable UUID eventTypeId,
+    public EventTypeResponse activation(@PathVariable("applicationId") UUID app_id, @PathVariable("eventTypeId") UUID event_type_id,
             @Valid @RequestBody Activation request) {
-        return service.setEventTypeActive(applicationId, eventTypeId, request.active());
+        return service.setEventTypeActive(app_id, event_type_id, request.active());
     }
 
     @DeleteMapping("/{eventTypeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID applicationId, @PathVariable UUID eventTypeId) {
-        service.deleteEventType(applicationId, eventTypeId);
+    public void delete(@PathVariable("applicationId") UUID app_id, @PathVariable("eventTypeId") UUID event_type_id) {
+        service.deleteEventType(app_id, event_type_id);
     }
     
 }

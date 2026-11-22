@@ -46,8 +46,8 @@ public class UserAccount extends BaseEntity {
         return passwordHash;
     }
 
-    public void changePasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
+    public void changePasswordHash(String password_hash) {
+        this.passwordHash = password_hash;
     }
 
     public String getRole() {
@@ -69,8 +69,8 @@ public class UserAccount extends BaseEntity {
         return clientId;
     }
 
-    public void assignClient(UUID clientId) {
-        this.clientId = clientId;
+    public void assignClient(UUID client_id) {
+        this.clientId = client_id;
     }
 
     //--------------------------------------------------------------
@@ -78,10 +78,10 @@ public class UserAccount extends BaseEntity {
     protected UserAccount() {
     }
 
-    public UserAccount(String name, String email, String passwordHash) {
+    public UserAccount(String name, String email, String password_hash) {
         this.name = name;
         this.email = email;
-        this.passwordHash = passwordHash;
+        this.passwordHash = password_hash;
     }
 
 }

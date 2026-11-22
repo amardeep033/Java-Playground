@@ -28,32 +28,32 @@ public class ApplicationController {
 
     @PostMapping("")
     @ResponseStatus(HttpStatus.CREATED)
-    public ApplicationResponse register(@PathVariable UUID userId, @Valid @RequestBody RegisterApplication request) {
-        return service.registerApplication(userId, request);
+    public ApplicationResponse register(@PathVariable("userId") UUID user_id, @Valid @RequestBody RegisterApplication request) {
+        return service.registerApplication(user_id, request);
     }
 
     @GetMapping("")
-    public PageResult<ApplicationResponse> list(@PathVariable UUID userId,
+    public PageResult<ApplicationResponse> list(@PathVariable("userId") UUID user_id,
             @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "") String status,
-            @RequestParam(required = false) UUID clientId, @PageableDefault(sort = "createdAt") Pageable pageable) {
-        return service.listApplications(userId, q, status, clientId, pageable);
+            @RequestParam(name = "clientId", required = false) UUID client_id, @PageableDefault(sort = "createdAt") Pageable pageable) {
+        return service.listApplications(user_id, q, status, client_id, pageable);
     }
 
     @GetMapping("/{applicationId}")
-    public ApplicationResponse get(@PathVariable UUID userId, @PathVariable UUID applicationId) {
-        return service.getApplication(userId, applicationId);
+    public ApplicationResponse get(@PathVariable("userId") UUID user_id, @PathVariable("applicationId") UUID app_id) {
+        return service.getApplication(user_id, app_id);
     }
 
     @PutMapping("/{applicationId}")
-    public ApplicationResponse update(@PathVariable UUID userId, @PathVariable UUID applicationId,
+    public ApplicationResponse update(@PathVariable("userId") UUID user_id, @PathVariable("applicationId") UUID app_id,
             @Valid @RequestBody UpdateApplication request) {
-        return service.updateApplication(userId, applicationId, request);
+        return service.updateApplication(user_id, app_id, request);
     }
 
     @DeleteMapping("/{applicationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID userId, @PathVariable UUID applicationId) {
-        service.deleteApplication(userId, applicationId);
+    public void delete(@PathVariable("userId") UUID user_id, @PathVariable("applicationId") UUID app_id) {
+        service.deleteApplication(user_id, app_id);
     }
 
 }

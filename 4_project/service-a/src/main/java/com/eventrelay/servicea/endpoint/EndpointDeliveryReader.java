@@ -19,15 +19,15 @@ public class EndpointDeliveryReader {
         this.endpoints = endpoints;
     }
 
-    public List<EndpointDeliveryConfig> findSubscribed(UUID applicationId, UUID eventTypeId) {
-        return endpoints.findSubscribed(applicationId, eventTypeId).stream().map(EndpointDeliveryConfig::from).toList();
+    public List<EndpointDeliveryConfig> findSubscribed(UUID app_id, UUID event_type_id) {
+        return endpoints.findSubscribed(app_id, event_type_id).stream().map(EndpointDeliveryConfig::from).toList();
     }
 
-    public List<UUID> findInactiveSubscribed(UUID applicationId, UUID eventTypeId) {
-        return endpoints.findInactiveSubscribed(applicationId, eventTypeId);
+    public List<UUID> findInactiveSubscribed(UUID app_id, UUID event_type_id) {
+        return endpoints.findInactiveSubscribed(app_id, event_type_id);
     }
 
-    public Optional<EndpointDeliveryConfig> findByIdAndApplicationId(UUID endpointId, UUID applicationId) {
-        return endpoints.findByIdAndApplicationId(endpointId, applicationId).map(EndpointDeliveryConfig::from);
+    public Optional<EndpointDeliveryConfig> findByIdAndApplicationId(UUID endpoint_id, UUID app_id) {
+        return endpoints.findByIdAndApplicationId(endpoint_id, app_id).map(EndpointDeliveryConfig::from);
     }
 }

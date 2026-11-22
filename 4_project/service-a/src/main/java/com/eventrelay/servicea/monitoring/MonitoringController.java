@@ -1,7 +1,12 @@
 package com.eventrelay.servicea.monitoring;
 
+import com.eventrelay.servicea.monitoring.dto.DeliveryDetails;
+import com.eventrelay.servicea.monitoring.dto.DeliverySummary;
+import com.eventrelay.servicea.monitoring.dto.EventSummary;
+import com.eventrelay.servicea.monitoring.dto.MonitoringSummary;
+import com.eventrelay.servicea.monitoring.dto.ReplayReceipt;
+
 import com.eventrelay.servicea.common.dto.PageResult;
-import com.eventrelay.servicea.monitoring.dto.MonitoringApi;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -9,33 +14,64 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/applications/{applicationId}")
 public class MonitoringController {
-    //request dto: none (query/path parameters and headers only)
-    //response dto: PageResult<MonitoringApi.EventSummary>, PageResult<MonitoringApi.DeliverySummary>, MonitoringApi.DeliveryDetails, MonitoringApi.Summary, MonitoringApi.ReplayReceipt
+    // request dto: none (query/path parameters and headers only)
+    // response dto: PageResult<EventSummary>, PageResult<DeliverySummary>, DeliveryDetails, MonitoringSummary, ReplayReceipt
 
     private final MonitoringService service;
-    public MonitoringController(MonitoringService service) { this.service=service; }
+
+    public MonitoringController(MonitoringService service) {
+        this.service = service;
+    }
+
+    // ----------------------------------------------------------------------------
+
+    // list events(which was missing in events)
     @GetMapping("/events")
-    public PageResult<MonitoringApi.EventSummary> events(@PathVariable UUID applicationId,
-            @RequestHeader(value="X-API-Key",required=false)String key,@RequestParam(defaultValue="")String status,
-            @RequestParam(defaultValue="")String q,@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="20")int size) {
-        return service.events(applicationId,key,status,q,page,size);
+    public PageResult<EventSummary> events(@PathVariable("applicationId") UUID app_id,
+            @RequestHeader(value = "X-API-Key", required = false) String api_key,
+            @RequestParam(defaultValue = "") String status,
+            @RequestParam(defaultValue = "") String q, @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return service.events(app_id, api_key, status, q, page, size);
     }
+
+    // ----------------------------------------------------------------------------
+
+    // list of all deliveries 
     @GetMapping("/deliveries")
-    public PageResult<MonitoringApi.DeliverySummary> deliveries(@PathVariable UUID applicationId,
-            @RequestHeader(value="X-API-Key",required=false)String key,@RequestParam(defaultValue="")String status,
-            @RequestParam(defaultValue="")String q,@RequestParam(required=false)UUID eventId,@RequestParam(required=false)UUID endpointId,
-            @RequestParam(defaultValue="true")boolean includeReplayed,@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="20")int size) {
-        return service.deliveries(applicationId,key,status,q,eventId,endpointId,includeReplayed,page,size);
+    public PageResult<DeliverySummary> deliveries(@PathVariable("applicationId") UUID app_id,
+            @RequestHeader(value = "X-API-Key", required = false) String api_key,
+            @RequestParam(defaultValue = "") String status,
+            @RequestParam(defaultValue = "") String q, @RequestParam(name = "eventId", required = false) UUID event_id,
+            @RequestParam(name = "endpointId", required = false) UUID endpoint_id,
+            @RequestParam(name = "includeReplayed", defaultValue = "true") boolean include_replayed, @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return service.deliveries(app_id, api_key, status, q, event_id, endpoint_id, include_replayed, page, size);
     }
+
+    // specific delivery detail 
     @GetMapping("/deliveries/{deliveryId}")
-    public MonitoringApi.DeliveryDetails delivery(@PathVariable UUID applicationId,@PathVariable UUID deliveryId,
-            @RequestHeader(value="X-API-Key",required=false)String key) { return service.delivery(applicationId,deliveryId,key); }
-    @GetMapping("/activity-summary")
-    public MonitoringApi.Summary summary(@PathVariable UUID applicationId,@RequestHeader(value="X-API-Key",required=false)String key) { return service.summary(applicationId,key); }
+    public DeliveryDetails delivery(@PathVariable("applicationId") UUID app_id, @PathVariable("deliveryId") UUID delivery_id,
+            @RequestHeader(value = "X-API-Key", required = false) String api_key) {
+        return service.delivery(app_id, delivery_id, api_key);
+    }
+
+    // replay from dlq
     @PostMapping("/deliveries/{deliveryId}/replay")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public MonitoringApi.ReplayReceipt replay(@PathVariable UUID applicationId,@PathVariable UUID deliveryId,
-            @RequestHeader(value="X-API-Key",required=false)String key,@RequestHeader(value="Idempotency-Key",required=false)String idempotencyKey) {
-        return service.replay(applicationId,deliveryId,key,idempotencyKey);
+    public ReplayReceipt replay(@PathVariable("applicationId") UUID app_id, @PathVariable("deliveryId") UUID delivery_id,
+            @RequestHeader(value = "X-API-Key", required = false) String api_key,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotency_key) {
+        return service.replay(app_id, delivery_id, api_key, idempotency_key);
     }
+
+    // ----------------------------------------------------------------------------
+
+    // counters at app level
+    @GetMapping("/activity-summary")
+    public MonitoringSummary summary(@PathVariable("applicationId") UUID app_id,
+            @RequestHeader(value = "X-API-Key", required = false) String api_key) {
+        return service.summary(app_id, api_key);
+    }
+
 }

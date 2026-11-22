@@ -16,7 +16,7 @@ public class RabbitMqConfig {
     public static final String STATUS_QUEUE = "event-relay.status.main";
 
     @Bean
-    Declarables topology(@Value("${app.retry-delay-ms:30000}") int retryDelay) {
+    Declarables topology(@Value("${app.retry-delay-ms:30000}") int retry_delay) {
 
         //configuration for both serviceA and serviceB
         var delivery = new DirectExchange(DELIVERY_EXCHANGE, true, false);
@@ -36,7 +36,7 @@ public class RabbitMqConfig {
 
         //retry in B
         var delayed = QueueBuilder.durable("event-relay.delivery.retry")
-                .ttl(retryDelay)
+                .ttl(retry_delay)
                 .deadLetterExchange(delivery.getName())
                 .deadLetterRoutingKey("delivery.requested")
                 .build();
@@ -52,15 +52,15 @@ public class RabbitMqConfig {
                 .build();
 
         //B to A status dlq
-        var statusDlq = QueueBuilder.durable("event-relay.status.dlq")
+        var status_dlq = QueueBuilder.durable("event-relay.status.dlq")
                 .build();
 
-        return new Declarables(delivery, retry, status, dead, main, delayed, dlq, updates, statusDlq,
+        return new Declarables(delivery, retry, status, dead, main, delayed, dlq, updates, status_dlq,
                 BindingBuilder.bind(main).to(delivery).with("delivery.requested"),
                 BindingBuilder.bind(delayed).to(retry).with("delivery.retry"),
                 BindingBuilder.bind(dlq).to(dead).with("delivery.dead"),
                 BindingBuilder.bind(updates).to(status).with("delivery.completed"),
-                BindingBuilder.bind(statusDlq).to(dead).with("status.dead"));
+                BindingBuilder.bind(status_dlq).to(dead).with("status.dead"));
     }
 
     // ExecutorService

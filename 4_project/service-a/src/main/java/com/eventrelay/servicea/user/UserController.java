@@ -38,39 +38,39 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse register(@Valid @RequestBody Signup request, HttpServletRequest http,
             HttpServletResponse response) {
-        var user = service.registerUser(request);
+        var user_response = service.registerUser(request);
         var result = auth.login(request.email(), request.password(), http.getRemoteAddr());
         var principal = result.user();
         response.setHeader("Cache-Control", "no-store");
         if (principal != null)
             cookies.issue(result.refresh(), http, response);
-        return user;
+        return user_response;
     }
 
     @GetMapping("/{userId}")
-    public UserResponse get(@PathVariable UUID userId) {
-        return service.getUser(userId);
+    public UserResponse get(@PathVariable("userId") UUID user_id) {
+        return service.getUser(user_id);
     }
 
     @PutMapping("/{userId}")
-    public UserResponse update(@PathVariable UUID userId, @Valid @RequestBody UpdateName request) {
-        return service.updateUser(userId, request);
+    public UserResponse update(@PathVariable("userId") UUID user_id, @Valid @RequestBody UpdateName request) {
+        return service.updateUser(user_id, request);
     }
 
     @PutMapping("/{userId}/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void changePassword(@PathVariable UUID userId, @Valid @RequestBody ChangePassword request,
+    public void changePassword(@PathVariable("userId") UUID user_id, @Valid @RequestBody ChangePassword request,
             HttpServletRequest http, HttpServletResponse response) {
-        service.changePassword(userId, request);
+        service.changePassword(user_id, request);
         cookies.clear(http, response);
     }
 
     @DeleteMapping("/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID userId, HttpServletRequest http,
+    public void delete(@PathVariable("userId") UUID user_id, HttpServletRequest http,
             HttpServletResponse response) {
-        service.deleteUser(userId);
-        if (userId.equals(JwtUser.current().id()))
+        service.deleteUser(user_id);
+        if (user_id.equals(JwtUser.current().id()))
             cookies.clear(http, response);
     }
 }

@@ -33,28 +33,28 @@ public class EndpointService {
     private final SecretEncryption encryption;
     private final AuditLogs audit;
 
-    public EndpointService(EndpointRepository endpoints, EventTypeRepository eventTypes, ResourceAccess access,
+    public EndpointService(EndpointRepository endpoints, EventTypeRepository event_types, ResourceAccess access,
             SecretEncryption encryption, AuditLogs audit) {
         this.endpoints = endpoints;
-        this.eventTypes = eventTypes;
+        this.eventTypes = event_types;
         this.access = access;
         this.encryption = encryption;
         this.audit = audit;
     }
 
     @Transactional
-    public IssuedEndpoint registerEndpoint(UUID applicationId, RegisterEndpoint request) {
-        access.lockedApplication(applicationId);
+    public IssuedEndpoint registerEndpoint(UUID app_id, RegisterEndpoint request) {
+        access.lockedApplication(app_id);
         validateUrl(request.url());
         var subscriptions = eventTypes.findAllById(request.eventTypeIds());
         if (subscriptions.size() != request.eventTypeIds().size()) {
             throw notFound("Event type");
         }
-        if (subscriptions.stream().anyMatch(event -> !event.getApplicationId().equals(applicationId))) {
+        if (subscriptions.stream().anyMatch(event -> !event.getApplicationId().equals(app_id))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "All event types must belong to this application");
         }
-        var endpoint = new Endpoint(applicationId, request.url(), request.description(), new HashSet<>(subscriptions));
+        var endpoint = new Endpoint(app_id, request.url(), request.description(), new HashSet<>(subscriptions));
         String name = request.name() == null ? URI.create(request.url()).getHost() : request.name();
         if (name.isBlank())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Endpoint name cannot be blank");
@@ -66,35 +66,35 @@ public class EndpointService {
         return issueSigningSecret(endpoint, true);
     }
 
-    public WebhookEndpoint getEndpoint(UUID applicationId, UUID endpointId) {
-        requireApplication(applicationId);
-        return WebhookEndpoint.from(endpoints.findByIdAndApplicationId(endpointId, applicationId)
+    public WebhookEndpoint getEndpoint(UUID app_id, UUID endpoint_id) {
+        requireApplication(app_id);
+        return WebhookEndpoint.from(endpoints.findByIdAndApplicationId(endpoint_id, app_id)
                 .orElseThrow(() -> notFound("Endpoint")));
     }
 
     @Transactional
-    public IssuedEndpoint rotateSigningSecret(UUID applicationId, UUID endpointId) {
-        access.lockedApplication(applicationId);
-        var endpoint = endpoints.findByIdAndApplicationId(endpointId, applicationId)
+    public IssuedEndpoint rotateSigningSecret(UUID app_id, UUID endpoint_id) {
+        access.lockedApplication(app_id);
+        var endpoint = endpoints.findByIdAndApplicationId(endpoint_id, app_id)
                 .orElseThrow(() -> notFound("Endpoint"));
         return issueSigningSecret(endpoint, false);
     }
 
     @Transactional
-    public WebhookEndpoint updateEndpoint(UUID appId, UUID id, UpdateEndpoint request) {
-        access.lockedApplication(appId);
-        var endpoint = endpoints.findByIdAndApplicationId(id, appId).orElseThrow(() -> notFound("Endpoint"));
+    public WebhookEndpoint updateEndpoint(UUID app_id, UUID endpoint_id, UpdateEndpoint request) {
+        access.lockedApplication(app_id);
+        var endpoint = endpoints.findByIdAndApplicationId(endpoint_id, app_id).orElseThrow(() -> notFound("Endpoint"));
         if (request.name() != null) {
             if (request.name().isBlank())
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Endpoint name cannot be blank");
-            audit.changed(appId, "endpoints", id, "name", endpoint.getName(), request.name().strip());
+            audit.changed(app_id, "endpoints", endpoint_id, "name", endpoint.getName(), request.name().strip());
             endpoint.updateName(request.name().strip());
         }
         if (request.hasDescription())
             endpoint.updateDescription(request.description());
         if (request.configuration() != null) {
             var config = request.configuration();
-            return updateEndpointSettings(appId, id,
+            return updateEndpointSettings(app_id, endpoint_id,
                     new EndpointSettings(null, null,
                             new EndpointConfiguration(endpoint.isEnabled(), config.rateLimitPerSecond(),
                                     config.concurrencyLimit(), config.timeoutMs(), config.maxAttempts())));
@@ -103,32 +103,32 @@ public class EndpointService {
     }
 
     @Transactional
-    public WebhookEndpoint adminEndpointUpdate(UUID appId, UUID id, AdminEndpointUpdate request) {
-        access.lockedApplication(appId);
-        access.workspaceAdmin(appId);
-        updateEndpointSettings(appId, id, new EndpointSettings(request.url(), request.eventTypeIds(), null));
-        var endpoint = endpoints.findByIdAndApplicationId(id, appId).orElseThrow(() -> notFound("Endpoint"));
+    public WebhookEndpoint adminEndpointUpdate(UUID app_id, UUID endpoint_id, AdminEndpointUpdate request) {
+        access.lockedApplication(app_id);
+        access.workspaceAdmin(app_id);
+        updateEndpointSettings(app_id, endpoint_id, new EndpointSettings(request.url(), request.eventTypeIds(), null));
+        var endpoint = endpoints.findByIdAndApplicationId(endpoint_id, app_id).orElseThrow(() -> notFound("Endpoint"));
         if (request.active() != null) {
-            audit.changed(appId, "endpoints", id, "is_active", endpoint.isEnabled(), request.active());
+            audit.changed(app_id, "endpoints", endpoint_id, "is_active", endpoint.isEnabled(), request.active());
             endpoint.setActive(request.active());
         }
         return WebhookEndpoint.from(endpoint);
     }
 
-    public PageResult<WebhookEndpoint> listEndpoints(UUID appId, String q, String status, Pageable page) {
-        requireApplication(appId);
-        var spec = ListSearch.<Endpoint>scoped("applicationId", appId, q, "name", "url", "description");
+    public PageResult<WebhookEndpoint> listEndpoints(UUID app_id, String q, String status, Pageable page) {
+        requireApplication(app_id);
+        var spec = ListSearch.<Endpoint>scoped("applicationId", app_id, q, "name", "url", "description");
         spec = activationFilter(spec, status, "enabled");
         return PageResult.from(endpoints.findAll(spec, page).map(WebhookEndpoint::from));
     }
 
-    private WebhookEndpoint updateEndpointSettings(UUID appId, UUID id, EndpointSettings request) {
-        access.lockedApplication(appId);
-        var endpoint = endpoints.findByIdAndApplicationId(id, appId).orElseThrow(() -> notFound("Endpoint"));
+    private WebhookEndpoint updateEndpointSettings(UUID app_id, UUID endpoint_id, EndpointSettings request) {
+        access.lockedApplication(app_id);
+        var endpoint = endpoints.findByIdAndApplicationId(endpoint_id, app_id).orElseThrow(() -> notFound("Endpoint"));
         if (request.url() != null && !endpoint.getUrl().equals(request.url())) {
-            access.workspaceAdmin(appId);
+            access.workspaceAdmin(app_id);
             validateUrl(request.url());
-            audit.write(appId, "endpoints", id, "ENDPOINT_UPDATED",
+            audit.write(app_id, "endpoints", endpoint_id, "ENDPOINT_UPDATED",
                     Map.of("field", "url", "old", endpoint.getUrl(), "new", request.url()));
             endpoint.updateUrl(request.url());
         }
@@ -136,14 +136,14 @@ public class EndpointService {
             var subscriptions = eventTypes.findAllById(request.eventTypeIds());
             if (subscriptions.size() != request.eventTypeIds().size())
                 throw notFound("Event type");
-            if (subscriptions.stream().anyMatch(type -> !type.getApplicationId().equals(appId)))
+            if (subscriptions.stream().anyMatch(type -> !type.getApplicationId().equals(app_id)))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "All event types must belong to this application");
             var old = endpoint.getEventTypes().stream().map(EventType::getId).sorted().toList();
             var next = subscriptions.stream().map(EventType::getId).sorted().toList();
             if (!old.equals(next)) {
-                access.workspaceAdmin(appId);
-                audit.write(appId, "endpoints", id, "EVENT_TYPE_MAPPINGS_UPDATED",
+                access.workspaceAdmin(app_id);
+                audit.write(app_id, "endpoints", endpoint_id, "EVENT_TYPE_MAPPINGS_UPDATED",
                         Map.of("field", "eventTypeIds", "old", old, "new", next));
                 endpoint.updateSubscriptions(new HashSet<>(subscriptions));
             }
@@ -151,14 +151,14 @@ public class EndpointService {
         var config = request.configuration();
         if (config != null) {
             if (endpoint.isEnabled() != config.enabled()) {
-                access.workspaceAdmin(appId);
-                audit.changed(appId, "endpoints", id, "is_active", endpoint.isEnabled(), config.enabled());
+                access.workspaceAdmin(app_id);
+                audit.changed(app_id, "endpoints", endpoint_id, "is_active", endpoint.isEnabled(), config.enabled());
             }
             var before = configurationAudit(endpoint);
             var after = Map.of("rateLimitPerSecond", config.rateLimitPerSecond(), "concurrencyLimit",
                     config.concurrencyLimit(), "timeoutMs", config.timeoutMs(), "maxAttempts", config.maxAttempts());
             if (!before.equals(after))
-                audit.write(appId, "endpoints", id, "CONFIG_UPDATED", Map.of("old", before, "new", after));
+                audit.write(app_id, "endpoints", endpoint_id, "CONFIG_UPDATED", Map.of("old", before, "new", after));
             endpoint.configure(config.enabled(), config.rateLimitPerSecond(), config.concurrencyLimit(),
                     config.timeoutMs(), config.maxAttempts());
         }
@@ -172,16 +172,16 @@ public class EndpointService {
     }
 
     private IssuedEndpoint issueSigningSecret(Endpoint endpoint, boolean initial) {
-        String secret = encryption.generateSecret();
-        endpoint.rotateSigningSecret(encryption.encrypt(secret, endpoint.getId()));
+        String signing_secret = encryption.generateSecret();
+        endpoint.rotateSigningSecret(encryption.encrypt(signing_secret, endpoint.getId()));
         audit.write(endpoint.getApplicationId(), "endpoints", endpoint.getId(),
                 initial ? "CREATED" : "SIGNING_CREDENTIAL_ROTATED",
                 Map.of("rotation", endpoint.getSigningSecretVersion()));
-        return new IssuedEndpoint(WebhookEndpoint.from(endpoint), secret);
+        return new IssuedEndpoint(WebhookEndpoint.from(endpoint), signing_secret);
     }
 
-    private Application requireApplication(UUID id) {
-        return access.application(id);
+    private Application requireApplication(UUID app_id) {
+        return access.application(app_id);
     }
 
     private static ResponseStatusException notFound(String resource) {
@@ -203,9 +203,9 @@ public class EndpointService {
     }
 
     @Transactional
-    public void deleteEndpoint(UUID appId, UUID endpointId) {
-        access.lockedApplication(appId);
-        endpoints.findByIdAndApplicationId(endpointId, appId).orElseThrow(() -> ResourceAccess.notFound("Endpoint"))
+    public void deleteEndpoint(UUID app_id, UUID endpoint_id) {
+        access.lockedApplication(app_id);
+        endpoints.findByIdAndApplicationId(endpoint_id, app_id).orElseThrow(() -> ResourceAccess.notFound("Endpoint"))
                 .softDelete();
     }
 

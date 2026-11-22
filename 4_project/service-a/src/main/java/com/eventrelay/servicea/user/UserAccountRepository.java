@@ -9,5 +9,5 @@ import org.springframework.data.jpa.repository.Query;
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from UserAccount u where u.id = :id")
-    Optional<UserAccount> findForUpdate(UUID id);
+    Optional<UserAccount> findForUpdate(@org.springframework.data.repository.query.Param("id") UUID user_id);
 }

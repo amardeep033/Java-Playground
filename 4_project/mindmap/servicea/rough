@@ -1,0 +1,109 @@
+
+HTTP REST --- customer events + UI APIs --- Up to 32 request threads
+RabbitMQ --- final status updates from B --- 4 listener threads
+Outbox publishing + reconciliation --- 2 shared scheduler threads
+
+
+user password + salt
+access token jwt
+jwt signing key
+refresh token
+csrf token 
+customer api key
+endpoint signing secret
+signing secret enc key
+internal service token
+database cred
+rabbitmq cred
+idempotency key
+outbox claim token
+rabbitmq routing key
+aes gcm nonce
+
+
+_schema_ + _main_ + _pom.xml_ + _app.prop_ + _config_
+_entity_ + _dto_ + _controller_
+_service + _repository
+_auth + _security
+
+_messaging + _events + _ingress
+_reconcilation + _monitoring + _workspace 
+_exception + _test
+
+// MVC flow: Controller(DTO - record) -> Service(model - sep comes in DDD) -> Repository(entity - JPA)
+
+// fix N=1 here
+// Location	What happens
+// [`RegistrationService.listEndpoints()` (line 229)](src/main/java/com/eventrelay/servicea/service/RegistrationService.java:229)	Loads a page of endpoints, then converts each endpoint to a DTO.
+// [`Responses.WebhookEndpoint.from()` (line 41)](src/main/java/com/eventrelay/servicea/dto/Responses.java:41)	Calls getEventTypes() for each endpoint, initializing its lazy collection with an additional query.
+
+
+// Because [`Endpoint.eventTypes` (line 56)](src/main/java/com/eventrelay/servicea/entity/Endpoint.java:56) is @ManyToMany(fetch = LAZY), listing 20 endpoints can produce 1 endpoint query + 20 subscription queries, plus pagination/count and authorization queries.
+
+// N+1 Fix options:
+// - JOIN FETCH: JPQL query explicitly fetches orders + items.
+// - @EntityGraph: repository method declares the fetch plan without custom JPQL.
+// - @BatchSize: query orders first, then Hibernate groups lazy item queries using where order_id in (...).
+
+always import
+rename service name
+replace PESSIMISTIC_WRITE with transactional 
+preauth*******
+algo details 
+status.retry queue
+constants
+
+//------------------------------------------------
+
+others 0
+
+user 2
+app 2
+apikey 2
+eventTypes 2
+endpoint 6
+
+common 5
+auth 6
+
+delivery
+events
+ingress
+
+monitoring
+workspace
+
+tests
+
+
+| Order | File under `delivery/` | Focus |
+|---|---|---|
+| 1 | `messaging/DeliveryCommand.java` | Message sent from A to B; immutable dispatch configuration and validation. |
+| 2 | `persistence/DeliveryProjectionStore.java` — `delivery()` | Initial delivery row created during ingestion/replay. Leave `applyStatus()` for step 6. |
+| 3 | `outbox/Outbox.java` | Read `enqueue()` first, then `publishPending()`: database insert → claim pending row → publish → broker confirmation → mark published. |
+
+| 4 | `messaging/DeliveryStatusMessage.java` | Final result B sends back to A. |
+| 5 | `messaging/StatusListener.java` → `StatusUpdateService.java` | Receive, validate, apply transactionally, then acknowledge; follow reject/requeue handling. |
+| 6 | `persistence/DeliveryProjectionStore.java` — `applyStatus()` | Deduplicate status messages and update delivery/attempt projections. |
+
+| 7 | `reconciliation/ReconciliationWorker.java` | Scheduled entry point for repairing missed status updates. |
+| 8 | `reconciliation/ReconciliationService.java` | Read checkpoint → fetch completion page → apply results → advance checkpoint atomically. |
+| 9 | `client/DeliveryCompletionClient.java` | Actual REST call to B, internal credential, and timeouts. |
+
+
+| File | Unused methods |
+|---|---|
+| [`ApplicationRepository`](src/main/java/com/eventrelay/servicea/application/ApplicationRepository.java:12) | `findByUserId`, `findByIdAndUserId`, `findAllByClientId`, `findAllByUserId` |
+| [`EndpointRepository`](src/main/java/com/eventrelay/servicea/endpoint/EndpointRepository.java:18) | `findByApplicationId` |
+| [`EventTypeRepository`](src/main/java/com/eventrelay/servicea/eventtype/EventTypeRepository.java:14) | `findByApplicationId` |
+| [`ApiKeyRepository`](src/main/java/com/eventrelay/servicea/apikey/ApiKeyRepository.java:11) | `findByApplicationId` |
+| [`ApplicationService`](src/main/java/com/eventrelay/servicea/application/ApplicationService.java:88) | Three- and four-argument `listApplications` overloads |
+| [`EventTypeService`](src/main/java/com/eventrelay/servicea/eventtype/EventTypeService.java:63) | Three-argument `listEventTypes` overload |
+| [`ClientService`](src/main/java/com/eventrelay/servicea/workspace/ClientService.java:35) | Four-argument `users` overload |
+| [`ResourceAccess`](src/main/java/com/eventrelay/servicea/auth/access/ResourceAccess.java:79) | `self` |
+| [`WorkspaceAccess`](src/main/java/com/eventrelay/servicea/auth/access/WorkspaceAccess.java:98) | `self`—called only by the unused wrapper above |
+| [`InternalServiceToken`](src/main/java/com/eventrelay/servicea/auth/InternalServiceToken.java:48) | `matches` |
+
+
+At 1,000 messages per second, a 1 KB payload produces approximately 1 MB/s of raw message data, before broker overhead and replication.
+
